@@ -9,6 +9,11 @@ error_chain! {
     }
 
     errors {
+        LoginPlease {
+            description("login please")
+            display("you are not logged in")
+        }
+
         NoUsernameGiven {
             description("no username given")
             display("please specify a username")

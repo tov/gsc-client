@@ -1,4 +1,5 @@
 use reqwest;
+use rpassword;
 
 pub mod errors;
 pub mod config;
@@ -10,42 +11,59 @@ pub struct GscClient {
     config: config::Config,
 }
 
+pub (crate) fn parse_cookies(chunks: &[String]) -> Option<(String, String)> {
+    for chunk in chunks {
+        for cookie in chunk.split(';') {
+            if let Some(index) = cookie.find('=') {
+                let key   = cookie[.. index].to_owned();
+                let value = cookie[index + 1 ..].to_owned();
+                return Some((key, value));
+            }
+        }
+    }
+
+    None
+}
+
 impl GscClient {
     pub fn new() -> Result<Self> {
         let http = reqwest::Client::new();
 
         let mut config = config::Config::default();
-        eprintln!("config before dotfile: {:?}", config);
         config.load_dotfile()?;
-        eprintln!("config after dotfile: {:?}", config);
-
-        config.save_dotfile()?;
 
         Ok(GscClient { http, config })
     }
 
-    pub fn login(&self) -> Result<String> {
-        let uri          = format!("{}/users/{}", self.config.endpoint, "root");
-        let password     = "foo";
-        let mut response = self.http.get(&uri)
-            .basic_auth("root", Some(password))
-            .send()?;
+    pub fn login(&mut self) -> Result<String> {
+        let username     = self.config.get_username()?;
+        let uri          = format!("{}/users/{}", self.config.endpoint, username);
 
+        let password     = rpassword::prompt_password_stderr("Password: ")?;
+
+        let mut response = self.http.get(&uri)
+            .basic_auth(username, Some(password))
+            .send()?;
 
         if let Some(reqwest::header::SetCookie(chunks)) = response.headers().get() {
-            eprintln!("Set-Cookie: {:?}", chunks);
+            self.config.cookie = parse_cookies(&chunks);
         }
 
-        Ok("".to_owned())
+        Ok(response.text()?)
     }
 
-    pub fn get_users(&self) -> Result<String> {
-        let uri          = format!("{}/users", self.config.endpoint);
-        let mut response = self.http.get(&uri)
-            .basic_auth("root", Some("foo"))
-            .send()?;
-        let text = response.text()?;
-        Ok(text)
+    pub fn get_users(&mut self) -> Result<String> {
+        let cookie       = self.config.get_cookie_header()?;
+        let uri          = format!("{}/users", self.config.endpoint);;
+        let mut request  = self.http.get(&uri);
+        request.header(cookie);
+        let mut response = request.send()?;
+
+        if let Some(reqwest::header::SetCookie(chunks)) = response.headers().get() {
+            self.config.cookie = parse_cookies(&chunks);
+        }
+
+        Ok(response.text()?)
     }
 }
 

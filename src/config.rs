@@ -18,8 +18,17 @@ const DOTFILE_NAME: &str = ".gsclogin";
 pub struct Config {
     pub dotfile:    Option<PathBuf>,
     pub username:   Option<String>,
-    pub cookie:     Option<String>,
+    pub cookie:     Option<(String, String)>,
     pub endpoint:   String,
+    pub save:       bool,
+}
+
+impl Drop for Config {
+    fn drop(&mut self) {
+        if let Err(err) = self.save_dotfile() {
+            eprintln!("Error saving dotfile: {}", err);
+        }
+    }
 }
 
 impl Default for Config {
@@ -43,6 +52,7 @@ impl Default for Config {
             username,
             cookie:     None,
             endpoint:   API_ENDPOINT.to_owned(),
+            save:       true,
         }
     }
 }
@@ -53,6 +63,20 @@ impl Config {
             Some(username) => Ok(&username),
             _              => Err(ErrorKind::NoUsernameGiven)?,
         }
+    }
+
+    pub fn get_cookie(&self) -> Result<(&str, &str)> {
+        match &self.cookie {
+            Some((key, value)) => Ok((&key, &value)),
+            None               => Err(ErrorKind::LoginPlease)?,
+        }
+    }
+
+    pub fn get_cookie_header(&self) -> Result<reqwest::header::Cookie> {
+        let (key, value) = self.get_cookie()?;
+        let mut header = reqwest::header::Cookie::new();
+        header.set(key.to_owned(), value.to_owned());
+        Ok(header)
     }
 
     pub fn get_dotfile(&self) -> Result<&Path> {
@@ -77,18 +101,20 @@ impl Config {
 
         let Dotfile { username, cookie, endpoint } = parsed;
         if !username.is_empty() { self.username = Some(username); }
-        if !cookie.is_empty() { self.cookie = Some(cookie); }
+        if !cookie.is_empty() { self.cookie = super::parse_cookies(&[cookie]); }
         if !endpoint.is_empty() { self.endpoint = endpoint; }
 
         Ok(())
     }
 
-    pub fn save_dotfile(&self) -> Result<()> {
+    fn save_dotfile(&self) -> Result<()> {
+        if !self.save { return Ok(()); }
+
         let dotfile_name = self.get_dotfile()?;
         let username = self.get_username()?.to_owned();
         let cookie = match &self.cookie {
-            Some(cookie) => cookie.to_owned(),
-            None         => "".to_owned(),
+            Some((key, value)) => format!("{}={}", key, value),
+            None               => "".to_owned(),
         };
         let endpoint = self.endpoint.clone();
         let contents = serde_yaml::to_string(&Dotfile { username, cookie, endpoint })?;
