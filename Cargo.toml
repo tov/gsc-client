@@ -5,4 +5,4 @@ authors = ["Jesse A. Tov <jesse@eecs.northwestern.edu>"]
 edition = "2018"
 
 [dependencies]
-
+reqwest = "0.8.8"
