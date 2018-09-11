@@ -27,7 +27,7 @@ pub (crate) fn parse_cookie(cookie: &str) -> Option<(String, String)> {
     }
 }
 
-pub (crate) fn parse_cookies(chunks: &[String]) -> Option<(String, String)> {
+pub fn parse_cookies(chunks: &[String]) -> Option<(String, String)> {
     for chunk in chunks {
         if let Some(pair) = parse_cookie(&chunk) {
             return Some(pair);
@@ -63,8 +63,9 @@ impl GscClient {
     }
 
     pub fn logout(&mut self) {
-        self.config.cookie = None;
+        self.config.cookie   = None;
         self.config.username = Some("".to_owned());
+        self.config.save     = true;
     }
 
     pub fn get_users(&mut self) -> Result<String> {
@@ -91,6 +92,7 @@ impl GscClient {
 
     fn prepare_cookie(&self, request: &mut reqwest::RequestBuilder) -> Result<()> {
         let cookie = self.config.get_cookie_header()?;
+        ve2!("> Sending cookie: {}", cookie);
         request.header(cookie);
         Ok(())
     }
@@ -98,7 +100,7 @@ impl GscClient {
     fn save_cookie(&mut self, response: &reqwest::Response) -> bool {
         if let Some(reqwest::header::SetCookie(chunks)) = response.headers().get() {
             if let Some(cookie) = parse_cookies(&chunks) {
-                ve3!("< Received cookie: {}={}", cookie.0, cookie.1);
+                ve2!("< Received cookie: {}={}", cookie.0, cookie.1);
                 self.config.cookie = Some(cookie);
                 self.config.save   = true;
                 return true;

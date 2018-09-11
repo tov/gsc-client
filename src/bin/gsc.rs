@@ -6,8 +6,8 @@ fn main() -> Result<()> {
 
     let mut client = gsc_client::GscClient::new()?;
 //    client.logout();
-    let result = client.login("jtov")?;
-//    let result = client.get_users()?;
+//    let result = client.login("jtov")?;
+    let result = client.get_users()?;
 //    println!("{}", result);
     Ok(())
 }
