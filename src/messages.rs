@@ -1,12 +1,12 @@
-use serde_derive::{Serialize, Deserialize};
+use serde_derive::Deserialize;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct SubmissionShort {
     pub assignment_number: usize,
     pub uri:               String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct Submission {
     pub assignment_number:  usize,
     pub uri:                String,
@@ -23,9 +23,19 @@ pub struct Submission {
     pub status:             String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct Owner {
     name:                   String,
+    uri:                    String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct FileMeta {
+    byte_count:             usize,
+    media_type:             String,
+    name:                   String,
+    purpose:                String,
+    upload_time:            String,
     uri:                    String,
 }
 

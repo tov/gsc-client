@@ -76,7 +76,8 @@ impl GscClient {
                                    self.config.get_username()?);
         let request      = self.http.get(&uri);
         let mut response = self.send_request(request)?;
-        Ok(response.json()?)
+        response.json()
+            .map_err(|e| Error::with_chain(e, "Could not understand response from server"))
     }
 
     fn get_uri_for_submission(&mut self, number: usize) -> Result<String> {
@@ -91,14 +92,18 @@ impl GscClient {
         Err(errors::ErrorKind::UnknownHomework(number))?
     }
 
+    fn get_uri_for_submission_files(&mut self, number: usize) -> Result<String> {
+        self.get_uri_for_submission(number).map(|uri| uri + "/files")
+    }
+
     pub fn ls_submission(&mut self, number: usize) -> Result<()>
     {
-        let uri          = self.get_uri_for_submission(number)?;
+        let uri          = self.get_uri_for_submission_files(number)?;
         let request      = self.http.get(&uri);
         let mut response = self.send_request(request)?;
 
-        let submission: messages::Submission = response.json()?;
-        v1!("{:?}", submission);
+        let files: Vec<messages::FileMeta> = response.json()?;
+        v1!("{:?}", files);
         Ok(())
     }
 
