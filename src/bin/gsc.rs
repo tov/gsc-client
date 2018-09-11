@@ -11,6 +11,7 @@ fn main() {
 
 enum Command {
     Auth(String),
+    Deauth,
 }
 
 fn do_it() -> Result<()> {
@@ -21,6 +22,7 @@ fn do_it() -> Result<()> {
 
     match command {
         Command::Auth(username) => client.auth(&username)?,
+        Command::Deauth         => client.deauth(),
     }
 
     Ok(())
@@ -48,7 +50,9 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 .add_common()
                 .arg(Arg::with_name("USER")
                     .help("The user to login as")
-                    .required(true))))
+                    .required(true)))
+             .subcommand(SubCommand::with_name("deauth")
+                 .about("Forgets authentication credentials")))
     }
 
     fn process(self, config: &mut gsc_client::config::Config) -> Result<Command> {
@@ -59,6 +63,10 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             process_common(submatches, config);
             let username = submatches.value_of("USER").unwrap();
             return Ok(Command::Auth(username.to_owned()));
+        }
+
+        else if let Some(_) = matches.subcommand_matches("deauth") {
+            return Ok(Command::Deauth);
         }
 
         Err(ErrorKind::NoCommandGiven)?
