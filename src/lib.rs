@@ -11,14 +11,25 @@ pub struct GscClient {
     config: config::Config,
 }
 
+pub (crate) fn parse_cookie(cookie: &str) -> Option<(String, String)> {
+    let pair = match cookie.find(';') {
+        Some(index) => &cookie[.. index],
+        None        => cookie,
+    };
+
+    if let Some(index) = cookie.find('=') {
+        let key   = cookie[.. index].to_owned();
+        let value = cookie[index + 1 ..].to_owned();
+        return Some((key, value));
+    } else {
+        return None;
+    }
+}
+
 pub (crate) fn parse_cookies(chunks: &[String]) -> Option<(String, String)> {
     for chunk in chunks {
-        for cookie in chunk.split(';') {
-            if let Some(index) = cookie.find('=') {
-                let key   = cookie[.. index].to_owned();
-                let value = cookie[index + 1 ..].to_owned();
-                return Some((key, value));
-            }
+        if let Some(pair) = parse_cookie(&chunk) {
+            return Some(pair);
         }
     }
 

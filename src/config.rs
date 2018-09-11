@@ -101,7 +101,7 @@ impl Config {
 
         let Dotfile { username, cookie, endpoint } = parsed;
         if !username.is_empty() { self.username = Some(username); }
-        if !cookie.is_empty() { self.cookie = super::parse_cookies(&[cookie]); }
+        if !cookie.is_empty() { self.cookie = super::parse_cookie(&cookie); }
         if !endpoint.is_empty() { self.endpoint = endpoint; }
 
         Ok(())
