@@ -13,8 +13,9 @@ pub struct JsonError {
 
 error_chain! {
     foreign_links {
-        Reqwest(reqwest::Error);
+        Clap(clap::Error);
         Io(std::io::Error);
+        Reqwest(reqwest::Error);
         SerdeYaml(serde_yaml::Error);
     }
 
@@ -26,19 +27,24 @@ error_chain! {
             contents.message)
         }
 
+        NoCommandGiven {
+            description("no subcommand given")
+            display("No subcommand given; pass -h for help.")
+        }
+
         LoginPlease {
             description("login please")
-            display("you are not logged in")
+            display("You are not logged in.")
         }
 
         NoUsernameGiven {
             description("no username given")
-            display("please specify a username")
+            display("Please specify a username.")
         }
 
         NoDotfileGiven {
             description("no dotfile given")
-            display("please specify a configuration file")
+            display("Please specify a configuration file.")
         }
     }
 }

@@ -36,12 +36,8 @@ pub fn parse_cookies(chunks: &[String]) -> Option<(String, String)> {
 }
 
 impl GscClient {
-    pub fn new() -> Result<Self> {
+    pub fn new(config: config::Config) -> Result<Self> {
         let http = reqwest::Client::new();
-
-        let mut config = config::Config::new();
-        config.load_dotfile()?;
-
         Ok(GscClient { http, config })
     }
 
