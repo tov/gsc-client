@@ -18,13 +18,11 @@ pub (crate) fn parse_cookie(cookie: &str) -> Option<(String, String)> {
         None        => cookie,
     };
 
-    if let Some(index) = pair.find('=') {
+    pair.find('=').map(|index| {
         let key   = pair[.. index].to_owned();
         let value = pair[index + 1 ..].to_owned();
-        return Some((key, value));
-    } else {
-        return None;
-    }
+        (key, value)
+    })
 }
 
 pub fn parse_cookies(chunks: &[String]) -> Option<(String, String)> {
@@ -101,7 +99,7 @@ impl GscClient {
 
     fn prepare_cookie(&self, request: &mut reqwest::RequestBuilder) -> Result<()> {
         let cookie = self.config.get_cookie_header()?;
-        ve2!("> Sending cookie: {}", cookie);
+
         request.header(cookie);
         Ok(())
     }
