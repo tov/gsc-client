@@ -25,17 +25,17 @@ pub struct Submission {
 
 #[derive(Deserialize, Debug)]
 pub struct Owner {
-    name:                   String,
-    uri:                    String,
+    pub name:               String,
+    pub uri:                String,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct FileMeta {
-    byte_count:             usize,
-    media_type:             String,
-    name:                   String,
-    purpose:                String,
-    upload_time:            String,
-    uri:                    String,
+    pub byte_count:         usize,
+    pub media_type:         String,
+    pub name:               String,
+    pub purpose:            String,
+    pub upload_time:        String,
+    pub uri:                String,
 }
 

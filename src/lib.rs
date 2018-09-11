@@ -5,6 +5,7 @@ use rpassword;
 pub mod config;
 pub mod errors;
 pub mod messages;
+pub mod table;
 
 use self::errors::{Error, ErrorKind, JsonError, Result};
 
@@ -103,7 +104,20 @@ impl GscClient {
         let mut response = self.send_request(request)?;
 
         let files: Vec<messages::FileMeta> = response.json()?;
-        v1!("{:?}", files);
+
+        let mut table = table::TextTable::new("%r  %l  [%l] %l\n");
+
+        for file in &files {
+            table = table.add_row(
+                table::Row::new()
+                    .add_cell(file.byte_count)
+                    .add_cell(&file.upload_time)
+                    .add_cell(&file.purpose[..1])
+                    .add_cell(&file.name));
+        }
+
+        v1!("{}", table);
+
         Ok(())
     }
 
