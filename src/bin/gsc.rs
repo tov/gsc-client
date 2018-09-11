@@ -8,7 +8,7 @@ fn main() -> Result<()> {
 //    client.logout();
 //    let result = client.login("jtov")?;
     let result = client.get_users()?;
-//    println!("{}", result);
+    println!("{}", result);
     Ok(())
 }
 

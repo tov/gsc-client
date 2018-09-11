@@ -56,8 +56,7 @@ impl GscClient {
         let mut response = self.http.get(&uri)
             .basic_auth(username, Some(password))
             .send()?;
-
-        self.save_cookie(&response);
+        self.handle_response(&mut response)?;
 
         Ok(response.text()?)
     }
@@ -79,9 +78,19 @@ impl GscClient {
         -> Result<reqwest::Response> {
 
         self.prepare_cookie(&mut request)?;
-        let response = request.send()?;
-        self.save_cookie(&response);
+        let mut response = request.send()?;
+        self.handle_response(&mut response)?;
         Ok(response)
+    }
+
+    fn handle_response(&mut self, response: &mut reqwest::Response) -> Result<()> {
+        if response.status().is_success() {
+            self.save_cookie(response);
+            Ok(())
+        } else {
+            let error = response.json()?;
+            Err(errors::ErrorKind::ServerError(error))?
+        }
     }
 
     fn prompt_password(&self, prompt: &str) -> Result<String> {

@@ -1,5 +1,15 @@
 use error_chain::*;
 use reqwest;
+use serde_derive::{Serialize, Deserialize};
+
+/// This is the format of error messages produced by the server.
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct JsonError {
+    pub status:  u16,
+    pub title:   String,
+    pub message: String,
+}
 
 error_chain! {
     foreign_links {
@@ -9,6 +19,11 @@ error_chain! {
     }
 
     errors {
+        ServerError(contents: JsonError) {
+            description("error from server")
+            display("Error {}: {}\n{}", contents.status, contents.title, contents.message)
+        }
+
         LoginPlease {
             description("login please")
             display("you are not logged in")
