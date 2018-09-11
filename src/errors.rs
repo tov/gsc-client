@@ -27,6 +27,16 @@ error_chain! {
             contents.message)
         }
 
+        UnknownHomework(number: usize) {
+            description("unknown homework")
+            display("Homework hw{} does not exist", number)
+        }
+
+        SyntaxError(thing: String) {
+            description("syntax error")
+            display("Syntax error: could not parse {}", thing)
+        }
+
         NoCommandGiven {
             description("no subcommand given")
             display("No subcommand given; pass -h for help.")

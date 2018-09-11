@@ -2,8 +2,9 @@ use vlog::*;
 use reqwest;
 use rpassword;
 
-pub mod errors;
 pub mod config;
+pub mod errors;
+pub mod messages;
 
 use self::errors::{Error, ErrorKind, JsonError, Result};
 
@@ -42,7 +43,7 @@ impl GscClient {
     }
 
     pub fn auth(&mut self, username: &str) -> Result<()> {
-        let uri = format!("{}/users/{}", self.config.endpoint, username);
+        let uri = format!("{}/api/users/{}", self.config.endpoint, username);
 
         self.config.username = Some(username.to_owned());
 
@@ -69,25 +70,60 @@ impl GscClient {
         self.config.save     = true;
     }
 
+    fn ls_submissions(&mut self) -> Result<Vec<messages::SubmissionShort>> {
+        let uri          = format!("{}/api/users/{}/submissions",
+                                   self.config.endpoint,
+                                   self.config.get_username()?);
+        let request      = self.http.get(&uri);
+        let mut response = self.send_request(request)?;
+        Ok(response.json()?)
+    }
+
+    fn get_uri_for_submission(&mut self, number: usize) -> Result<String> {
+        let submissions = self.ls_submissions()?;
+
+        for submission in &submissions {
+            if submission.assignment_number == number {
+                return Ok(format!("{}{}", self.config.endpoint, submission.uri));
+            }
+        }
+
+        Err(errors::ErrorKind::UnknownHomework(number))?
+    }
+
+    pub fn ls_submission(&mut self, number: usize) -> Result<()>
+    {
+        let uri          = self.get_uri_for_submission(number)?;
+        let request      = self.http.get(&uri);
+        let mut response = self.send_request(request)?;
+
+        let submission: messages::Submission = response.json()?;
+        v1!("{:?}", submission);
+        Ok(())
+    }
+
     pub fn get_users(&mut self) -> Result<String> {
-        let uri          = format!("{}/users", self.config.endpoint);;
+        let uri          = format!("{}/api/users", self.config.endpoint);;
         let request      = self.http.get(&uri);
         let mut response = self.send_request(request)?;
         Ok(response.text()?)
     }
 
-    fn send_request(&mut self, mut request: reqwest::RequestBuilder)
+    fn send_request(&mut self, mut req_builder: reqwest::RequestBuilder)
         -> Result<reqwest::Response> {
 
-        self.prepare_cookie(&mut request)?;
-        let mut response = request.send()?;
+        self.prepare_cookie(&mut req_builder)?;
+        let request = req_builder.build()?;
+        ve2!("> Sending request to {}", request.url());
+        let mut response = self.http.execute(request)?;
         self.handle_response(&mut response)?;
         Ok(response)
     }
 
     fn handle_response(&mut self, response: &mut reqwest::Response) -> Result<()> {
+        self.save_cookie(response);
+
         if response.status().is_success() {
-            self.save_cookie(response);
             Ok(())
         } else {
             let error = response.json()?;
@@ -103,7 +139,7 @@ impl GscClient {
 
     fn prepare_cookie(&self, request: &mut reqwest::RequestBuilder) -> Result<()> {
         let cookie = self.config.get_cookie_header()?;
-
+        ve2!("> Sending cookie: {}", cookie);
         request.header(cookie);
         Ok(())
     }

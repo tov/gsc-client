@@ -7,7 +7,7 @@ use super::errors::*;
 use serde_derive::{Serialize, Deserialize};
 use serde_yaml;
 
-const API_ENDPOINT: &str = "http://localhost:9090/api";
+const API_ENDPOINT: &str = "http://localhost:9090";
 const DOTFILE_VAR: &str  = "GSC_LOGIN";
 const DOTFILE_NAME: &str = ".gsclogin";
 
