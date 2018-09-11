@@ -21,7 +21,9 @@ error_chain! {
     errors {
         ServerError(contents: JsonError) {
             description("error from server")
-            display("Error {}: {}\n{}", contents.status, contents.title, contents.message)
+            display("Error response from server:\n  {}: {}\n  {}",
+                    contents.status, contents.title,
+            contents.message)
         }
 
         LoginPlease {

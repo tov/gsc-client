@@ -5,7 +5,7 @@ use rpassword;
 pub mod errors;
 pub mod config;
 
-use self::errors::Result;
+use self::errors::{Error, ErrorKind, JsonError, Result};
 
 pub struct GscClient {
     http:   reqwest::Client,
@@ -49,19 +49,27 @@ impl GscClient {
         let uri = format!("{}/users/{}", self.config.endpoint, username);
 
         self.config.username = Some(username.to_owned());
-        let password = self.prompt_password("Password")?;
 
-        let mut response = self.http.get(&uri)
-            .basic_auth(username, Some(password))
-            .send()?;
-        self.handle_response(&mut response)?;
+        loop {
+            let password = self.prompt_password("Password")?;
+            let mut response = self.http.get(&uri)
+                .basic_auth(username, Some(password))
+                .send()?;
 
-        Ok(response.text()?)
+            match self.handle_response(&mut response) {
+                Ok(()) =>
+                    return Ok(response.text()?),
+                Err(e @ Error(ErrorKind::ServerError(JsonError { status: 401, .. }), _)) =>
+                    eprintln!("{}", e),
+                e =>
+                    e?,
+            }
+        }
     }
 
     pub fn logout(&mut self) {
         self.config.cookie   = None;
-        self.config.username = Some("".to_owned());
+        self.config.username = None;
         self.config.save     = true;
     }
 
@@ -87,7 +95,7 @@ impl GscClient {
             Ok(())
         } else {
             let error = response.json()?;
-            Err(errors::ErrorKind::ServerError(error))?
+            Err(ErrorKind::ServerError(error))?
         }
     }
 

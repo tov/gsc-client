@@ -108,7 +108,7 @@ impl Config {
         if !self.save { return Ok(()); }
 
         let dotfile_name = self.get_dotfile()?;
-        let username = self.get_username()?.to_owned();
+        let username = self.get_username().unwrap_or("").to_owned();
         let cookie = match &self.cookie {
             Some((key, value)) => format!("{}={}", key, value),
             None               => "".to_owned(),
