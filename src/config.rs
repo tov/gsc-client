@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 
 use super::errors::*;
 
-use serde;
 use serde_derive::{Serialize, Deserialize};
 use serde_yaml;
 
@@ -31,8 +30,8 @@ impl Drop for Config {
     }
 }
 
-impl Default for Config {
-    fn default() -> Self {
+impl Config {
+    pub fn new() -> Self {
         let dotfile = match env::var_os(DOTFILE_VAR) {
             Some(file) => Some(PathBuf::from(file)),
             None       => match env::var_os("HOME") {
@@ -52,12 +51,10 @@ impl Default for Config {
             username,
             cookie:     None,
             endpoint:   API_ENDPOINT.to_owned(),
-            save:       true,
+            save:       false,
         }
     }
-}
 
-impl Config {
     pub fn get_username(&self) -> Result<&str> {
         match &self.username {
             Some(username) => Ok(&username),
@@ -128,6 +125,7 @@ impl Config {
 #[serde(deny_unknown_fields)]
 pub struct Dotfile {
     #[serde(default)]
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub username:   String,
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
