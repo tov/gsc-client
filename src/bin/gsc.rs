@@ -13,7 +13,7 @@ fn main() {
 fn do_it() -> Result<()> {
     let mut client = gsc_client::GscClient::new()?;
 //    let result = client.get_users()?;
-    let result = client.login("jtov")?;
-    println!("{}", result);
+//    println!("{}", result);
+    let result = client.auth("jtov")?;
     Ok(())
 }

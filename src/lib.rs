@@ -45,7 +45,7 @@ impl GscClient {
         Ok(GscClient { http, config })
     }
 
-    pub fn login(&mut self, username: &str) -> Result<String> {
+    pub fn auth(&mut self, username: &str) -> Result<()> {
         let uri = format!("{}/users/{}", self.config.endpoint, username);
 
         self.config.username = Some(username.to_owned());
@@ -58,7 +58,7 @@ impl GscClient {
 
             match self.handle_response(&mut response) {
                 Ok(()) =>
-                    return Ok(response.text()?),
+                    return Ok(()),
                 Err(e @ Error(ErrorKind::ServerError(JsonError { status: 401, .. }), _)) =>
                     eprintln!("{}", e),
                 e =>
@@ -67,7 +67,7 @@ impl GscClient {
         }
     }
 
-    pub fn logout(&mut self) {
+    pub fn deauth(&mut self) {
         self.config.cookie   = None;
         self.config.username = None;
         self.config.save     = true;
@@ -124,6 +124,5 @@ impl GscClient {
 
         false
     }
-
 }
 

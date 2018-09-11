@@ -44,11 +44,9 @@ impl Config {
             }
         };
 
-        let username = env::var("USER").ok();
-
         Config {
             dotfile,
-            username,
+            username:   None,
             cookie:     None,
             endpoint:   API_ENDPOINT.to_owned(),
             save:       false,
@@ -94,7 +92,10 @@ impl Config {
         };
 
         let parsed: Dotfile = serde_yaml::from_str(&contents)
-            .map_err(|e| Error::with_chain(e, "Could not parse dotfile"))?;
+            .map_err(|e| {
+                let message = format!("Could not parse dotfile: {}", dotfile_name.display());
+                Error::with_chain(e, message)
+            })?;
 
         let Dotfile { username, cookie, endpoint } = parsed;
         if !username.is_empty() { self.username = Some(username); }
