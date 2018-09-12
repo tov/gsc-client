@@ -71,18 +71,24 @@ impl GscClient {
         self.config.save     = true;
     }
 
-    fn ls_submissions(&mut self) -> Result<Vec<messages::SubmissionShort>> {
-        let uri          = format!("{}/api/users/{}/submissions",
-                                   self.config.endpoint,
-                                   self.config.get_username()?);
+    fn ls_submissions(&mut self, user_option: Option<String>)
+        -> Result<Vec<messages::SubmissionShort>> {
+
+        let user         = match &user_option {
+            Some(user) => &user,
+            None       => self.config.get_username()?,
+        };
+        let uri          = format!("{}/api/users/{}/submissions", self.config.endpoint, user);
         let request      = self.http.get(&uri);
         let mut response = self.send_request(request)?;
         response.json()
             .map_err(|e| Error::with_chain(e, "Could not understand response from server"))
     }
 
-    fn get_uri_for_submission(&mut self, number: usize) -> Result<String> {
-        let submissions = self.ls_submissions()?;
+    fn get_uri_for_submission(&mut self, user: Option<String>, number: usize)
+        -> Result<String> {
+
+        let submissions = self.ls_submissions(user)?;
 
         for submission in &submissions {
             if submission.assignment_number == number {
@@ -93,13 +99,15 @@ impl GscClient {
         Err(errors::ErrorKind::UnknownHomework(number))?
     }
 
-    fn get_uri_for_submission_files(&mut self, number: usize) -> Result<String> {
-        self.get_uri_for_submission(number).map(|uri| uri + "/files")
+    fn get_uri_for_submission_files(&mut self, user: Option<String>, number: usize)
+        -> Result<String> {
+
+        self.get_uri_for_submission(user, number).map(|uri| uri + "/files")
     }
 
-    pub fn ls_submission(&mut self, number: usize) -> Result<()>
+    pub fn ls_submission(&mut self, user: Option<String>, number: usize) -> Result<()>
     {
-        let uri          = self.get_uri_for_submission_files(number)?;
+        let uri          = self.get_uri_for_submission_files(user, number)?;
         let request      = self.http.get(&uri);
         let mut response = self.send_request(request)?;
 
@@ -121,9 +129,9 @@ impl GscClient {
         Ok(())
     }
 
-    pub fn status(&mut self, number: usize) -> Result<()>
+    pub fn status(&mut self, user: Option<String>, number: usize) -> Result<()>
     {
-        let uri          = self.get_uri_for_submission(number)?;
+        let uri          = self.get_uri_for_submission(user, number)?;
         let request      = self.http.get(&uri);
         let mut response = self.send_request(request)?;
 

@@ -13,8 +13,8 @@ fn main() {
 enum Command {
     Auth(String),
     Deauth,
-    Ls(usize),
-    Status(usize),
+    Ls(Option<String>, usize),
+    Status(Option<String>, usize),
 }
 
 fn do_it() -> Result<()> {
@@ -24,10 +24,10 @@ fn do_it() -> Result<()> {
     let mut client = gsc_client::GscClient::new(config)?;
 
     match command {
-        Command::Auth(username) => client.auth(&username)?,
-        Command::Deauth         => client.deauth(),
-        Command::Ls(hw)         => client.ls_submission(hw)?,
-        Command::Status(hw)     => client.status(hw)?,
+        Command::Auth(username)   => client.auth(&username)?,
+        Command::Deauth           => client.deauth(),
+        Command::Ls(user, hw)     => client.ls_submission(user, hw)?,
+        Command::Status(user, hw) => client.status(user, hw)?,
     }
 
     Ok(())
@@ -61,13 +61,25 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
              .subcommand(SubCommand::with_name("ls")
                  .about("Lists files")
                  .add_common()
-                 .arg(Arg::with_name("LS_ARG")
+                 .arg(Arg::with_name("USER")
+                     .long("user")
+                     .short("u")
+                     .help("The user whose homework to list")
+                     .takes_value(true)
+                     .required(false))
+                 .arg(Arg::with_name("HW")
                      .help("The homework to list, e.g. ‘hw3’")
                      .required(true)))
              .subcommand(SubCommand::with_name("status")
                  .about("Retrieves submission status")
                  .add_common()
-                 .arg(Arg::with_name("STATUS_ARG")
+                 .arg(Arg::with_name("USER")
+                     .long("user")
+                     .short("u")
+                     .help("The user whose homework to lookup")
+                     .takes_value(true)
+                     .required(false))
+                 .arg(Arg::with_name("HW")
                      .help("The homework, e.g. ‘hw3’")
                      .required(true))))
     }
@@ -88,14 +100,16 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
 
         else if let Some(submatches) = matches.subcommand_matches("ls") {
             process_common(submatches, config);
-            let ls_spec = submatches.value_of("LS_ARG").unwrap();
-            Ok(Command::Ls(parse_hw_spec(ls_spec)?))
+            let ls_spec = submatches.value_of("HW").unwrap();
+            let user = submatches.value_of("USER").map(str::to_owned);
+            Ok(Command::Ls(user, parse_hw_spec(ls_spec)?))
         }
 
         else if let Some(submatches) = matches.subcommand_matches("status") {
             process_common(submatches, config);
-            let ls_spec = submatches.value_of("STATUS_ARG").unwrap();
-            Ok(Command::Status(parse_status_spec(ls_spec)?))
+            let ls_spec = submatches.value_of("HW").unwrap();
+            let user = submatches.value_of("USER").map(str::to_owned);
+            Ok(Command::Status(user, parse_status_spec(ls_spec)?))
         }
 
         else {
