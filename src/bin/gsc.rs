@@ -38,8 +38,10 @@ struct GscClientApp<'a: 'b, 'b>(clap::App<'a, 'b>);
 fn process_common<'a>(matches: &clap::ArgMatches<'a>,
                       _config: &mut gsc_client::config::Config)
 {
-    let dverbosity = matches.occurrences_of("VERBOSE") - matches.occurrences_of("QUIET");
-    vlog::set_verbosity_level(dverbosity as usize + vlog::get_verbosity_level());
+    let vs = matches.occurrences_of("VERBOSE") as usize;
+    let qs = matches.occurrences_of("QUIET") as usize;
+    let verbosity = if qs > vs { 0 } else { vlog::get_verbosity_level() + vs - qs };
+    vlog::set_verbosity_level(verbosity);
 }
 
 impl<'a, 'b> GscClientApp<'a, 'b> {
