@@ -1,6 +1,13 @@
-use serde_derive::Deserialize;
+use serde_derive::{Serialize, Deserialize};
 
-type DateTime = chrono::DateTime<chrono::offset::FixedOffset>;
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DateTime(chrono::DateTime<chrono::offset::FixedOffset>);
+
+impl std::fmt::Display for DateTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.0.format("%b %d %H:%M"))
+    }
+}
 
 #[derive(Deserialize, Debug)]
 pub struct SubmissionShort {
