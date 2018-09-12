@@ -128,11 +128,7 @@ impl GscClient {
         let mut response = self.send_request(request)?;
 
         let submission: messages::Submission = response.json()?;
-        let in_evaluation = match submission.status {
-            messages::SubmissionStatus::SelfEval => true,
-            messages::SubmissionStatus::ExtendedEval => true,
-            _ => false
-        };
+        let in_evaluation = submission.status.is_self_eval();
 
         let mut table = table::TextTable::new("  %l  %l\n");
         table.add_row(table::Row::new().add_cell("Submission status:")
@@ -143,8 +139,17 @@ impl GscClient {
                 .add_cell(submission.eval_status));
         }
 
-        table.add_row(table::Row::new().add_cell("Bytes used:")
-            .add_cell(format!("{} (of {} allowed)",
+        table
+            .add_row(table::Row::new().add_cell("Open date:")
+                .add_cell(submission.open_date))
+            .add_row(table::Row::new().add_cell("Submission due date:")
+                .add_cell(submission.due_date))
+            .add_row(table::Row::new().add_cell("Self-eval due date:")
+                .add_cell(submission.eval_date))
+            .add_row(table::Row::new().add_cell("Last modified:")
+                .add_cell(submission.last_modified))
+            .add_row(table::Row::new().add_cell("Bytes used:")
+                .add_cell(format!("{} (of {} allowed)",
                                   submission.bytes_used,
                                   submission.bytes_quota)));
 

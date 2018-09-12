@@ -26,18 +26,32 @@ pub enum SubmissionStatus {
     Closed,
 }
 
-impl std::fmt::Display for SubmissionStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl SubmissionStatus {
+    fn to_str(&self) -> &'static str {
         use self::SubmissionStatus::*;
-        let s = match *self {
+        match *self {
             Future       => "future",
             Open         => "open for submission",
             SelfEval     => "open for self evaluation",
             Extended     => "open for submission (extended)",
             ExtendedEval => "open for self evaluation (extended)",
             Closed       => "closed",
-        };
-        f.write_str(s)
+        }
+    }
+
+    pub fn is_self_eval(&self) -> bool {
+        use self::SubmissionStatus::*;
+        match *self {
+            SelfEval     => true,
+            ExtendedEval => true,
+            _            => false,
+        }
+    }
+}
+
+impl std::fmt::Display for SubmissionStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(self.to_str())
     }
 }
 
@@ -49,15 +63,20 @@ pub enum SubmissionEvalStatus {
     Complete,
 }
 
-impl std::fmt::Display for SubmissionEvalStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl SubmissionEvalStatus {
+    fn to_str(&self) -> &'static str {
         use self::SubmissionEvalStatus::*;
-        let s = match *self {
+        match *self {
             Empty    => "empty",
             Started  => "started",
             Complete => "complete",
-        };
-        f.write_str(s)
+        }
+    }
+}
+
+impl std::fmt::Display for SubmissionEvalStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(self.to_str())
     }
 }
 
