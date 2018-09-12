@@ -49,12 +49,7 @@ error_chain! {
 
         LoginPlease {
             description("login please")
-            display("You are not logged in.")
-        }
-
-        NoUsernameGiven {
-            description("no username given")
-            display("Please specify a username.")
+            display("You are not logged in; use the ‘gsc auth’ command to log in.")
         }
 
         NoDotfileGiven {

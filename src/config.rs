@@ -56,7 +56,7 @@ impl Config {
     pub fn get_username(&self) -> Result<&str> {
         match &self.username {
             Some(username) => Ok(&username),
-            _              => Err(ErrorKind::NoUsernameGiven)?,
+            _              => Err(ErrorKind::LoginPlease)?,
         }
     }
 
