@@ -1,5 +1,7 @@
 use serde_derive::Deserialize;
 
+type DateTime = chrono::DateTime<chrono::offset::FixedOffset>;
+
 #[derive(Deserialize, Debug)]
 pub struct SubmissionShort {
     pub assignment_number: usize,
@@ -15,10 +17,10 @@ pub struct Submission {
     pub owner2:             Option<Owner>,
     pub bytes_remaining:    usize,
     pub bytes_used:         usize,
-    pub open_date:          String,
-    pub due_date:           String,
-    pub eval_date:          String,
-    pub last_modified:      String,
+    pub open_date:          DateTime,
+    pub due_date:           DateTime,
+    pub eval_date:          DateTime,
+    pub last_modified:      DateTime,
     pub eval_status:        String,
     pub status:             String,
 }
@@ -35,7 +37,7 @@ pub struct FileMeta {
     pub media_type:         String,
     pub name:               String,
     pub purpose:            String,
-    pub upload_time:        String,
+    pub upload_time:        DateTime,
     pub uri:                String,
 }
 

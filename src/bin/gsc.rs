@@ -1,4 +1,4 @@
-use gsc_client::errors::{Error, ErrorKind, Result};
+use gsc_client::errors::{ErrorKind, Result};
 use lazy_static::lazy_static;
 
 fn main() {
