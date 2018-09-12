@@ -52,9 +52,11 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
 
         GscClientApp(App::new("gsc")
             .author("Jesse A. Tov <jesse@eecs.northwestern.edu>")
+            .about("Command-line interface to the GSC server")
             .version(crate_version!())
             .add_common()
             .subcommand(SubCommand::with_name("auth")
+                .name("auth")
                 .about("Authenticates with the server")
                 .add_common()
                 .arg(Arg::with_name("USER")

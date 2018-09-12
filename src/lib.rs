@@ -183,7 +183,7 @@ impl GscClient {
             Err(errors::ErrorKind::PasswordMismatch)?;
         }
 
-        let uri          = format!("{}/api/users", self.config.endpoint);
+        let uri = format!("{}/api/users", self.config.endpoint);
         ve2!("> Sending request to {}", uri);
         let mut response = self.http.post(&uri)
             .basic_auth(username, Some(password1))
@@ -212,6 +212,8 @@ impl GscClient {
     }
 
     fn handle_response(&mut self, response: &mut reqwest::Response) -> Result<()> {
+        ve3!("< Raw response from server: {:?}", response);
+
         self.save_cookie(response);
 
         if response.status().is_success() {
