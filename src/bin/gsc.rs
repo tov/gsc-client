@@ -12,6 +12,7 @@ fn main() {
 
 enum Command {
     Auth(String),
+    Create(String),
     Deauth,
     Ls(Option<String>, usize),
     Status(Option<String>, usize),
@@ -25,6 +26,7 @@ fn do_it() -> Result<()> {
 
     match command {
         Command::Auth(username)   => client.auth(&username)?,
+        Command::Create(username) => client.create(&username)?,
         Command::Deauth           => client.deauth(),
         Command::Ls(user, hw)     => client.ls_submission(user, hw)?,
         Command::Status(user, hw) => client.status(user, hw)?,
@@ -58,32 +60,38 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 .arg(Arg::with_name("USER")
                     .help("The user to login as")
                     .required(true)))
-             .subcommand(SubCommand::with_name("deauth")
-                 .about("Forgets authentication credentials"))
-             .subcommand(SubCommand::with_name("ls")
-                 .about("Lists files")
-                 .add_common()
-                 .arg(Arg::with_name("USER")
-                     .long("user")
-                     .short("u")
-                     .help("The user whose homework to list")
-                     .takes_value(true)
-                     .required(false))
-                 .arg(Arg::with_name("HW")
-                     .help("The homework to list, e.g. ‘hw3’")
-                     .required(true)))
-             .subcommand(SubCommand::with_name("status")
-                 .about("Retrieves submission status")
-                 .add_common()
-                 .arg(Arg::with_name("USER")
-                     .long("user")
-                     .short("u")
-                     .help("The user whose homework to lookup")
-                     .takes_value(true)
-                     .required(false))
-                 .arg(Arg::with_name("HW")
-                     .help("The homework, e.g. ‘hw3’")
-                     .required(true))))
+            .subcommand(SubCommand::with_name("create")
+                .about("Creates a new account")
+                .add_common()
+                .arg(Arg::with_name("USER")
+                    .help("The new account’s username")
+                    .required(true)))
+            .subcommand(SubCommand::with_name("deauth")
+                .about("Forgets authentication credentials"))
+            .subcommand(SubCommand::with_name("ls")
+                .about("Lists files")
+                .add_common()
+                .arg(Arg::with_name("USER")
+                    .long("user")
+                    .short("u")
+                    .help("The user whose homework to list")
+                    .takes_value(true)
+                    .required(false))
+                .arg(Arg::with_name("HW")
+                    .help("The homework to list, e.g. ‘hw3’")
+                    .required(true)))
+            .subcommand(SubCommand::with_name("status")
+                .about("Retrieves submission status")
+                .add_common()
+                .arg(Arg::with_name("USER")
+                    .long("user")
+                    .short("u")
+                    .help("The user whose homework to lookup")
+                    .takes_value(true)
+                    .required(false))
+                .arg(Arg::with_name("HW")
+                    .help("The homework, e.g. ‘hw3’")
+                    .required(true))))
     }
 
     fn process(self, config: &mut gsc_client::config::Config) -> Result<Command> {
@@ -94,6 +102,12 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             process_common(submatches, config);
             let username = submatches.value_of("USER").unwrap();
             Ok(Command::Auth(username.to_owned()))
+        }
+
+        else if let Some(submatches) = matches.subcommand_matches("create") {
+            process_common(submatches, config);
+            let username = submatches.value_of("USER").unwrap();
+            Ok(Command::Create(username.to_owned()))
         }
 
         else if let Some(_) = matches.subcommand_matches("deauth") {

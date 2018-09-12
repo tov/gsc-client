@@ -37,6 +37,11 @@ error_chain! {
             display("Syntax error: could not parse {}", thing)
         }
 
+        PasswordMismatch {
+            description("password mismatch")
+            display("Passwords do not match")
+        }
+
         NoCommandGiven {
             description("no subcommand given")
             display("No subcommand given; pass -h for help.")

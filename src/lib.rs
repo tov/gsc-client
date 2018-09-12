@@ -173,6 +173,26 @@ impl GscClient {
         Ok(())
     }
 
+    pub fn create(&mut self, username: &str) -> Result<()> {
+        self.config.username = Some(username.to_owned());
+
+        let password1 = self.prompt_password("New password")?;
+        let password2 = self.prompt_password("Confirm password")?;
+
+        if password1 != password2 {
+            Err(errors::ErrorKind::PasswordMismatch)?;
+        }
+
+        let uri          = format!("{}/api/users", self.config.endpoint);
+        ve2!("> Sending request to {}", uri);
+        let mut response = self.http.post(&uri)
+            .basic_auth(username, Some(password1))
+            .send()?;
+        self.handle_response(&mut response)?;
+
+        Ok(())
+    }
+
     pub fn get_users(&mut self) -> Result<String> {
         let uri          = format!("{}/api/users", self.config.endpoint);;
         let request      = self.http.get(&uri);
