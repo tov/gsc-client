@@ -85,7 +85,7 @@ impl TextTable {
         }
     }
 
-    pub fn add_row(mut self, row: Row) -> Self {
+    pub fn add_row(&mut self, row: Row) -> &mut Self {
         assert_eq!(row.0.len(), self.n_columns);
 
         for (width, s) in self.column_widths.iter_mut().zip(row.0.iter()) {

@@ -108,7 +108,7 @@ impl GscClient {
         let mut table = table::TextTable::new("%r  %l  [%l] %l\n");
 
         for file in &files {
-            table = table.add_row(
+            table.add_row(
                 table::Row::new()
                     .add_cell(file.byte_count)
                     .add_cell(&file.upload_time)
@@ -116,6 +116,45 @@ impl GscClient {
                     .add_cell(&file.name));
         }
 
+        v1!("{}", table);
+
+        Ok(())
+    }
+
+    pub fn status(&mut self, number: usize) -> Result<()>
+    {
+        let uri          = self.get_uri_for_submission(number)?;
+        let request      = self.http.get(&uri);
+        let mut response = self.send_request(request)?;
+
+        let submission: messages::Submission = response.json()?;
+        let in_evaluation = match submission.status {
+            messages::SubmissionStatus::SelfEval => true,
+            messages::SubmissionStatus::ExtendedEval => true,
+            _ => false
+        };
+
+        let mut table = table::TextTable::new("  %l  %l\n");
+        table.add_row(table::Row::new().add_cell("Submission status:")
+            .add_cell(submission.status));
+
+        if in_evaluation {
+            table.add_row(table::Row::new().add_cell("Evaluation status:")
+                .add_cell(submission.eval_status));
+        }
+
+        table.add_row(table::Row::new().add_cell("Bytes used:")
+            .add_cell(format!("{} (of {} allowed)",
+                                  submission.bytes_used,
+                                  submission.bytes_quota)));
+
+        let mut owners = submission.owner1.name.clone();
+        if let Some(owner2) = &submission.owner2 {
+            owners += " and ";
+            owners += &owner2.name;
+        }
+
+        v1!("hw{} ({})", number, owners);
         v1!("{}", table);
 
         Ok(())

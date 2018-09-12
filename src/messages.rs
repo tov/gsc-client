@@ -9,10 +9,56 @@ impl std::fmt::Display for DateTime {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SubmissionShort {
     pub assignment_number: usize,
     pub uri:               String,
+}
+
+#[derive(Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum SubmissionStatus {
+    Future,
+    Open,
+    SelfEval,
+    Extended,
+    ExtendedEval,
+    Closed,
+}
+
+impl std::fmt::Display for SubmissionStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        use self::SubmissionStatus::*;
+        let s = match *self {
+            Future       => "future",
+            Open         => "open for submission",
+            SelfEval     => "open for self evaluation",
+            Extended     => "open for submission (extended)",
+            ExtendedEval => "open for self evaluation (extended)",
+            Closed       => "closed",
+        };
+        f.write_str(s)
+    }
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum SubmissionEvalStatus {
+    Empty,
+    Started,
+    Complete,
+}
+
+impl std::fmt::Display for SubmissionEvalStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        use self::SubmissionEvalStatus::*;
+        let s = match *self {
+            Empty    => "empty",
+            Started  => "started",
+            Complete => "complete",
+        };
+        f.write_str(s)
+    }
 }
 
 #[derive(Deserialize, Debug)]
@@ -22,14 +68,14 @@ pub struct Submission {
     pub files_uri:          String,
     pub owner1:             Owner,
     pub owner2:             Option<Owner>,
-    pub bytes_remaining:    usize,
     pub bytes_used:         usize,
+    pub bytes_quota:        usize,
     pub open_date:          DateTime,
     pub due_date:           DateTime,
     pub eval_date:          DateTime,
     pub last_modified:      DateTime,
-    pub eval_status:        String,
-    pub status:             String,
+    pub eval_status:        SubmissionEvalStatus,
+    pub status:             SubmissionStatus,
 }
 
 #[derive(Deserialize, Debug)]

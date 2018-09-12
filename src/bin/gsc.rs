@@ -14,6 +14,7 @@ enum Command {
     Auth(String),
     Deauth,
     Ls(usize),
+    Status(usize),
 }
 
 fn do_it() -> Result<()> {
@@ -26,6 +27,7 @@ fn do_it() -> Result<()> {
         Command::Auth(username) => client.auth(&username)?,
         Command::Deauth         => client.deauth(),
         Command::Ls(hw)         => client.ls_submission(hw)?,
+        Command::Status(hw)     => client.status(hw)?,
     }
 
     Ok(())
@@ -57,11 +59,17 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
              .subcommand(SubCommand::with_name("deauth")
                  .about("Forgets authentication credentials"))
              .subcommand(SubCommand::with_name("ls")
-                .about("Lists files")
-                .add_common()
-                .arg(Arg::with_name("LS_SPEC")
-                    .help("The homework to list, e.g. ‘hw3’")
-                    .required(true))))
+                 .about("Lists files")
+                 .add_common()
+                 .arg(Arg::with_name("LS_ARG")
+                     .help("The homework to list, e.g. ‘hw3’")
+                     .required(true)))
+             .subcommand(SubCommand::with_name("status")
+                 .about("Retrieves submission status")
+                 .add_common()
+                 .arg(Arg::with_name("STATUS_ARG")
+                     .help("The homework, e.g. ‘hw3’")
+                     .required(true))))
     }
 
     fn process(self, config: &mut gsc_client::config::Config) -> Result<Command> {
@@ -80,8 +88,14 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
 
         else if let Some(submatches) = matches.subcommand_matches("ls") {
             process_common(submatches, config);
-            let ls_spec = submatches.value_of("LS_SPEC").unwrap();
+            let ls_spec = submatches.value_of("LS_ARG").unwrap();
             Ok(Command::Ls(parse_hw_spec(ls_spec)?))
+        }
+
+        else if let Some(submatches) = matches.subcommand_matches("status") {
+            process_common(submatches, config);
+            let ls_spec = submatches.value_of("STATUS_ARG").unwrap();
+            Ok(Command::Status(parse_status_spec(ls_spec)?))
         }
 
         else {
@@ -96,6 +110,20 @@ fn parse_hw_spec(hw_spec: &str) -> Result<usize> {
     }
 
     if let Some(i) = HW_RE.captures(hw_spec)
+        .and_then(|captures| captures.get(1))
+        .and_then(|s| s.as_str().parse().ok()) {
+        Ok(i)
+    } else {
+        Err(ErrorKind::SyntaxError("homework spec".to_owned()))?
+    }
+}
+
+fn parse_status_spec(status_spec: &str) -> Result<usize> {
+    lazy_static! {
+        static ref HW_RE: regex::Regex = regex::Regex::new(r"hw(\d)").unwrap();
+    }
+
+    if let Some(i) = HW_RE.captures(status_spec)
         .and_then(|captures| captures.get(1))
         .and_then(|s| s.as_str().parse().ok()) {
         Ok(i)
