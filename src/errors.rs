@@ -22,7 +22,7 @@ error_chain! {
     errors {
         ServerError(contents: JsonError) {
             description("error from server")
-            display("Error response from server:\n  {}: {}\n  {}",
+            display("Error response from server:\n  {} {}\n  {}",
                     contents.status, contents.title,
             contents.message)
         }
