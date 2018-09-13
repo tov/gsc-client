@@ -79,33 +79,18 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             .subcommand(SubCommand::with_name("ls")
                 .about("Lists files")
                 .add_common()
-                .arg(Arg::with_name("USER")
-                    .long("user")
-                    .short("u")
-                    .help("The user whose homework to list")
-                    .takes_value(true)
-                    .required(false))
+                .add_user_opt("The user whose homework to list")
                 .arg(Arg::with_name("HW")
                     .help("The homework to list, e.g. ‘hw3’")
                     .required(true)))
             .subcommand(SubCommand::with_name("passwd")
                 .about("Changes the password")
                 .add_common()
-                .arg(Arg::with_name("USER")
-                    .long("user")
-                    .short("u")
-                    .help("The user whose password to change")
-                    .takes_value(true)
-                    .required(false)))
+                .add_user_opt("The user whose password to change"))
             .subcommand(SubCommand::with_name("status")
                 .about("Retrieves submission status")
                 .add_common()
-                .arg(Arg::with_name("USER")
-                    .long("user")
-                    .short("u")
-                    .help("The user whose homework to lookup")
-                    .takes_value(true)
-                    .required(false))
+                .add_user_opt("The user whose homework to lookup")
                 .arg(Arg::with_name("HW")
                     .help("The homework, e.g. ‘hw3’")
                     .required(true))))
@@ -187,11 +172,12 @@ fn parse_status_spec(status_spec: &str) -> Result<usize> {
     }
 }
 
-trait CommonOptions {
+trait AppExt {
     fn add_common(self) -> Self;
+    fn add_user_opt(self, about: &'static str) -> Self;
 }
 
-impl<'a, 'b> CommonOptions for clap::App<'a, 'b> {
+impl<'a, 'b> AppExt for clap::App<'a, 'b> {
     fn add_common(self) -> Self {
         use clap::*;
         
@@ -208,5 +194,15 @@ impl<'a, 'b> CommonOptions for clap::App<'a, 'b> {
                 .multiple(true)
                 .takes_value(false)
                 .help("Makes the output quieter"))
+    }
+
+    fn add_user_opt(self, about: &'static str) -> Self {
+        use clap::*;
+        self.arg(Arg::with_name("USER")
+            .short("u")
+            .long("user")
+            .help(about)
+            .takes_value(true)
+            .required(false))
     }
 }
