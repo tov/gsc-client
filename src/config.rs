@@ -15,19 +15,10 @@ const DOTFILE_NAME: &str = ".gsclogin";
 /// (below).
 #[derive(Debug)]
 pub struct Config {
-    pub dotfile:    Option<PathBuf>,
-    pub username:   String,
-    pub cookie:     Option<(String, String)>,
-    pub endpoint:   String,
-    pub save:       bool,
-}
-
-impl Drop for Config {
-    fn drop(&mut self) {
-        if let Err(err) = self.save_dotfile() {
-            eprintln!("Error saving dotfile: {}", err);
-        }
-    }
+    dotfile:    Option<PathBuf>,
+    username:   String,
+    cookie:     Option<(String, String)>,
+    endpoint:   String,
 }
 
 impl Config {
@@ -49,22 +40,35 @@ impl Config {
             username:   String::new(),
             cookie:     None,
             endpoint:   API_ENDPOINT.to_owned(),
-            save:       false,
         }
+    }
+
+    pub fn get_endpoint(&self) -> &str {
+        &self.endpoint
     }
 
     pub fn get_username(&self) -> &str {
         &self.username
     }
 
-    pub fn get_cookie(&self) -> Result<(&str, &str)> {
+    pub fn set_username(&mut self, username: String) {
+        self.username = username;
+    }
+
+    pub fn get_cookie(&mut self) -> Result<(&str, &str)> {
+        self.load_dotfile()?;
         match &self.cookie {
             Some((key, value)) => Ok((&key, &value)),
             None               => Err(ErrorKind::LoginPlease)?,
         }
     }
 
-    pub fn get_cookie_header(&self) -> Result<reqwest::header::Cookie> {
+    pub fn set_cookie(&mut self, cookie: Option<(String, String)>) -> Result<()> {
+        self.cookie = cookie;
+        self.save_dotfile()
+    }
+
+    pub fn get_cookie_header(&mut self) -> Result<reqwest::header::Cookie> {
         let (key, value) = self.get_cookie()?;
         let mut header = reqwest::header::Cookie::new();
         header.set(key.to_owned(), value.to_owned());
@@ -103,8 +107,6 @@ impl Config {
     }
 
     fn save_dotfile(&self) -> Result<()> {
-        if !self.save { return Ok(()); }
-
         let dotfile_name = self.get_dotfile()?;
         let username = self.get_username().to_owned();
         let cookie = match &self.cookie {

@@ -31,7 +31,7 @@ fn do_it() -> Result<()> {
         Command::Auth{user}        => client.auth(&user)?,
         Command::Cat{user, pats}   => client.cat(bs(&user), &pats)?,
         Command::Create{user}      => client.create(&user)?,
-        Command::Deauth            => client.deauth(),
+        Command::Deauth            => client.deauth()?,
         Command::Ls{user, hw, pat} => client.ls(bs(&user), hw, &pat)?,
         Command::Passwd{user}      => client.passwd(bs(&user))?,
         Command::Status{user, hw}  => client.status(bs(&user), hw)?,
