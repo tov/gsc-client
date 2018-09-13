@@ -88,8 +88,10 @@ impl GscClient {
 
             let cookie_lock = self.config.new_cookie()?;
             match self.handle_response(&mut response, cookie_lock) {
-                Ok(()) =>
-                    return Ok(()),
+                Ok(()) => {
+                    v2!("Authenticated as {}", username);
+                    return Ok(());
+                }
                 Err(e @ Error(ErrorKind::ServerError(JsonError { status: 401, .. }), _)) =>
                     eprintln!("{}", e),
                 e =>
@@ -275,6 +277,7 @@ impl GscClient {
     pub fn deauth(&mut self) -> Result<()> {
         let mut cookie_lock = self.config.new_cookie()?;
         cookie_lock.deauth();
+        v2!("Deauthenticated.");
         Ok(())
     }
 
@@ -308,7 +311,7 @@ impl GscClient {
     fn get_uri_for_submission(&mut self, user_option: Option<&str>, number: usize)
         -> Result<String> {
 
-        let user        = self.select_user(user_option).to_owned();
+        let user        = self.select_user(user_option);
 
         let mut cache   = replace(&mut self.submission_uris, HashMap::new());
         let uris        = match cache.entry(user.clone()) {
@@ -447,17 +450,21 @@ impl GscClient {
         let cookie_lock = self.config.new_cookie()?;
         self.handle_response(&mut response, cookie_lock)?;
 
+        v2!("Created account: {}.", username);
+
         Ok(())
     }
 
     pub fn passwd(&mut self, user_option: Option<&str>) -> Result<()> {
         let user         = self.select_user(user_option);
-        let password     = get_matching_passwords(user)?;
+        let password     = get_matching_passwords(&user)?;
         let message      = messages::PasswordChange { password };
         let uri          = format!("{}/api/users/{}", self.config.get_endpoint(), user);
         let mut request  = self.http.patch(&uri);
         request.json(&message);
         self.send_request(request)?;
+
+        v2!("Changed password for user {}.", user);
 
         Ok(())
     }
@@ -502,11 +509,11 @@ impl GscClient {
         Ok(response.text()?)
     }
 
-    fn select_user<'a>(&'a self, username_option: Option<&'a str>) -> &'a str {
+    fn select_user(&self, username_option: Option<&str>) -> String {
         match username_option {
             Some(s) => s,
             None    => self.config.get_username(),
-        }
+        }.to_owned()
     }
 
     fn send_request(&mut self, mut req_builder: reqwest::RequestBuilder)
