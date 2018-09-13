@@ -300,6 +300,17 @@ impl GscClient {
         Ok(())
     }
 
+    pub fn whoami(&self) -> Result<()> {
+        let username = self.config.get_username();
+
+        if username.is_empty() {
+            return Err(Error::from(ErrorKind::LoginPlease))
+        }
+
+        v1!("{}", username);
+        Ok(())
+    }
+
     pub fn get_users(&mut self) -> Result<String> {
         let uri          = format!("{}/api/users", self.config.get_endpoint());;
         let request      = self.http.get(&uri);

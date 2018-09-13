@@ -25,6 +25,7 @@ enum Command {
     Passwd{user: Option<String>},
     Rm{user: Option<String>, pats: Vec<RemotePattern>},
     Status{user: Option<String>, hw: usize},
+    Whoami,
 }
 
 fn do_it() -> Result<bool> {
@@ -42,6 +43,7 @@ fn do_it() -> Result<bool> {
         Command::Passwd{user}      => client.passwd(bs(&user))?,
         Command::Rm{user, pats}    => client.rm(bs(&user), &pats)?,
         Command::Status{user, hw}  => client.status(bs(&user), hw)?,
+        Command::Whoami            => client.whoami()?,
     }
 
     Ok(client.had_warning())
@@ -92,7 +94,8 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                     .help("The new account’s username (i.e., your NetID)")
                     .required(true)))
             .subcommand(SubCommand::with_name("deauth")
-                .about("Forgets authentication credentials"))
+                .about("Forgets authentication credentials")
+                .add_common())
             .subcommand(SubCommand::with_name("ls")
                 .about("Lists files")
                 .add_common()
@@ -124,7 +127,10 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 .add_user_opt("The user whose homework to lookup")
                 .arg(Arg::with_name("HW")
                     .help("The homework, e.g. ‘hw3’")
-                    .required(true))))
+                    .required(true)))
+            .subcommand(SubCommand::with_name("whoami")
+                .about("Prints your username, if authenticated")
+                .add_common()))
     }
 
     fn process(self, config: &mut config::Config) -> Result<Command> {
@@ -155,7 +161,8 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             Ok(Command::Create{user})
         }
 
-        else if let Some(_) = matches.subcommand_matches("deauth") {
+        else if let Some(submatches) = matches.subcommand_matches("deauth") {
+            process_common(submatches, config);
             Ok(Command::Deauth)
         }
 
@@ -192,6 +199,11 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             let hw_spec = submatches.value_of("HW").unwrap();
             let hw      = parse_hw(hw_spec)?;
             Ok(Command::Status{user, hw})
+        }
+
+        else if let Some(submatches) = matches.subcommand_matches("whoami") {
+            process_common(submatches, config);
+            Ok(Command::Whoami)
         }
 
         else {
