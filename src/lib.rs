@@ -8,7 +8,7 @@ pub mod messages;
 pub mod table;
 
 use self::errors::{Error, ErrorKind, JsonError, Result};
-use self::config::CookieLock;
+use self::config::DotfileLock;
 
 pub struct GscClient {
     http:               reqwest::Client,
@@ -300,7 +300,7 @@ impl GscClient {
 
     fn handle_response(&mut self,
                        response: &mut reqwest::Response,
-                       cookie_lock: CookieLock)
+                       cookie_lock: DotfileLock)
         -> Result<()> {
 
         ve3!("< Raw response from server: {:?}", response);
@@ -315,8 +315,8 @@ impl GscClient {
         }
     }
 
-    fn prepare_cookie(&mut self, request: &mut reqwest::RequestBuilder) -> Result<CookieLock> {
-        let cookie_lock = self.config.lock_cookie()?;
+    fn prepare_cookie(&mut self, request: &mut reqwest::RequestBuilder) -> Result<DotfileLock> {
+        let cookie_lock = self.config.lock_dotfile()?;
         let cookie      = cookie_lock.get_cookie_header();
         ve2!("> Sending cookie: {}", cookie);
         request.header(cookie);
@@ -325,7 +325,7 @@ impl GscClient {
 
     fn save_cookie(&mut self,
                    response: &reqwest::Response,
-                   mut cookie_lock: CookieLock)
+                   mut cookie_lock: DotfileLock)
         -> Result<()> {
 
         if let Some(reqwest::header::SetCookie(chunks)) = response.headers().get() {

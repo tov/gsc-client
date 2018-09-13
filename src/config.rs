@@ -55,8 +55,8 @@ impl Config {
         self.username = username;
     }
 
-    fn new_cookie_lock(&mut self, dotfile: Dotfile, key: String, value: String)
-        -> Result<CookieLock> {
+    fn new_dotfile_lock(&mut self, dotfile: Dotfile, key: String, value: String)
+                        -> Result<DotfileLock> {
 
         let file = std::fs::OpenOptions::new()
             .write(true)
@@ -64,7 +64,7 @@ impl Config {
             .open(&self.get_dotfile()?)?;
         file.lock_exclusive()?;
 
-        Ok(CookieLock {
+        Ok(DotfileLock {
             file,
             dirty: false,
             key,
@@ -73,15 +73,18 @@ impl Config {
         })
     }
 
-    pub fn new_cookie(&mut self) -> Result<CookieLock> {
-        self.new_cookie_lock(self.read_dotfile()?, String::new(), String::new())
+    pub fn new_cookie(&mut self) -> Result<DotfileLock> {
+        let mut dotfile = self.read_dotfile()?;
+        dotfile.username = self.username.clone();
+        dotfile.endpoint = self.endpoint.clone();
+        self.new_dotfile_lock(dotfile, String::new(), String::new())
     }
 
-    pub fn lock_cookie(&mut self) -> Result<CookieLock> {
+    pub fn lock_dotfile(&mut self) -> Result<DotfileLock> {
         let dotfile = self.read_dotfile()?;
         let (key, value) = super::parse_cookie(&dotfile.cookie)
             .ok_or(ErrorKind::LoginPlease)?;
-        self.new_cookie_lock(dotfile, key, value)
+        self.new_dotfile_lock(dotfile, key, value)
     }
 
     pub fn get_dotfile(&self) -> Result<&Path> {
@@ -128,7 +131,7 @@ impl Config {
 }
 
 #[derive(Debug)]
-pub struct CookieLock {
+pub struct DotfileLock {
     file:       std::fs::File,
     dirty:      bool,
     key:        String,
@@ -136,7 +139,7 @@ pub struct CookieLock {
     dotfile:    Dotfile,
 }
 
-impl Drop for CookieLock {
+impl Drop for DotfileLock {
     fn drop(&mut self) {
         if self.dirty {
             if let Err(e) = self.flush_cookie() {
@@ -146,7 +149,7 @@ impl Drop for CookieLock {
     }
 }
 
-impl CookieLock {
+impl DotfileLock {
     pub fn get_cookie(&self) -> (&str, &str) {
         return (&self.key, &self.value);
     }
