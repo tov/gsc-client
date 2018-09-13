@@ -196,6 +196,7 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
                 .help("Makes the output quieter"))
     }
 
+    #[cfg(feature = "admin")]
     fn add_user_opt(self, about: &'static str) -> Self {
         use clap::*;
         self.arg(Arg::with_name("USER")
@@ -204,5 +205,10 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
             .help(about)
             .takes_value(true)
             .required(false))
+    }
+
+    #[cfg(not(feature = "admin"))]
+    fn add_user_opt(self, _about: &'static str) -> Self {
+        self
     }
 }

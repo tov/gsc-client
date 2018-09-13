@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Jesse A. Tov <jesse@eecs.northwestern.edu>"]
 edition = "2018"
 
+[features]
+admin = []
+
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 clap = "2.0.32"
