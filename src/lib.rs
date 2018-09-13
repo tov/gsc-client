@@ -270,12 +270,32 @@ impl GscClient {
 
     pub fn passwd(&mut self, user_option: Option<&str>) -> Result<()> {
         let user         = self.select_user(user_option);
-        let uri          = format!("{}/api/users/{}", self.config.get_endpoint(), user);
         let password     = get_matching_passwords(user)?;
         let message      = messages::PasswordChange { password };
+        let uri          = format!("{}/api/users/{}", self.config.get_endpoint(), user);
         let mut request  = self.http.patch(&uri);
         request.json(&message);
         self.send_request(request)?;
+
+        Ok(())
+    }
+
+    pub fn rm(&mut self, user: Option<&str>, pats: &[RemotePattern]) -> Result<()> {
+        for RemotePattern { hw, pat } in pats {
+            let files = self.fetch_file_list(user, *hw, pat)?;
+
+            if files.is_empty() {
+                let error = Error::from(ErrorKind::NoSuchRemoteFile(*hw, pat.to_owned()));
+                ve1!("{}", error);
+                self.had_warning = true;
+            }
+
+            for file in files {
+                let uri          = format!("{}{}", self.config.get_endpoint(), file.uri);
+                let request      = self.http.delete(&uri);
+                self.send_request(request)?;
+            }
+        }
 
         Ok(())
     }
