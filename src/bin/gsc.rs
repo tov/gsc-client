@@ -1,5 +1,5 @@
 use gsc_client::*;
-use gsc_client::errors::{ErrorKind, Result};
+use gsc_client::errors::{Result, syntax_error, no_command_given};
 use std::process::exit;
 
 fn main() {
@@ -240,7 +240,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
         }
 
         else {
-            Err(ErrorKind::NoCommandGiven)?
+            Err(no_command_given())
         }
     }
 }
@@ -291,11 +291,11 @@ mod re {
     use regex::Regex;
 
     lazy_static! {
-        pub static ref HW_ONLY:         Regex = Regex::new(r"hw(\d+):?").unwrap();
-        pub static ref HW_OPT_FILE:     Regex = Regex::new(r"hw(\d+)(?::(.*))?").unwrap();
-        pub static ref HW_FILE:         Regex = Regex::new(r"hw(\d+):(.*)").unwrap();
-        pub static ref HW_FILE_NE:      Regex = Regex::new(r"hw(\d+):(.+)").unwrap();
-        pub static ref LOCAL_FILE:      Regex = Regex::new(r":(.+)").unwrap();
+        pub static ref HW_ONLY:         Regex = Regex::new(r"^hw(\d+):?$").unwrap();
+        pub static ref HW_OPT_FILE:     Regex = Regex::new(r"^hw(\d+)(?::(.*))?$").unwrap();
+        pub static ref HW_FILE:         Regex = Regex::new(r"^hw(\d+):(.*)$").unwrap();
+        pub static ref HW_FILE_NE:      Regex = Regex::new(r"^hw(\d+):(.+)$").unwrap();
+        pub static ref LOCAL_FILE:      Regex = Regex::new(r"^:(.+)$").unwrap();
     }
 }
 
@@ -305,13 +305,13 @@ fn parse_hw(spec: &str) -> Result<usize> {
         .and_then(|s| s.as_str().parse().ok()) {
         Ok(i)
     } else {
-        Err(ErrorKind::SyntaxError("homework spec".to_owned()))?
+        Err(syntax_error("homework spec", spec))
     }
 }
 
 fn parse_hw_opt_file(spec: &str) -> Result<(usize, String)> {
     let captures  = re::HW_OPT_FILE.captures(spec)
-        .ok_or_else(|| ErrorKind::SyntaxError("homework or file spec".to_owned()))?;
+        .ok_or_else(|| syntax_error("homework or file spec", spec))?;
     let capture1  = captures.get(1).unwrap().as_str();
     let capture2  = captures.get(2).map(|c| c.as_str());
     let hw_number = capture1.parse().unwrap();
@@ -322,12 +322,14 @@ fn parse_hw_opt_file(spec: &str) -> Result<(usize, String)> {
 fn parse_hw_file(file_spec: &str, allow_bare: bool) -> Result<RemotePattern> {
     let re = if allow_bare {&*re::HW_FILE} else {&*re::HW_FILE_NE};
 
-    let err = ||
-        if allow_bare {
+    let err = || {
+        let message = if allow_bare {
             "remote file or homework spec"
         } else {
             "remote file spec"
-        }.to_owned();
+        };
+        syntax_error(message, file_spec)
+    };
 
     let captures  = re.captures(file_spec).ok_or_else(err)?;
     let capture1  = captures.get(1).unwrap().as_str();
@@ -339,7 +341,7 @@ fn parse_hw_file(file_spec: &str, allow_bare: bool) -> Result<RemotePattern> {
 
 fn parse_cp_arg(spec: &str, allow_bare: bool) -> Result<CpArg> {
     if spec.is_empty() {
-        Err(ErrorKind::SyntaxError("empty file name".to_owned()))?
+        Err(syntax_error("empty file name", spec))?
     } else if let Some(captures) = re::LOCAL_FILE.captures(spec) {
         let filename = captures.get(1).unwrap().as_str().to_owned();
         Ok(CpArg::Local(filename.into()))

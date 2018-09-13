@@ -36,9 +36,9 @@ error_chain! {
             display("Homework hw{} does not exist", number)
         }
 
-        SyntaxError(thing: String) {
+        SyntaxError(class: String, thing: String) {
             description("syntax error")
-            display("Syntax error: could not parse {}", thing)
+            display("Syntax error: Could not parse {}: ‘{}’.", class, thing)
         }
 
         PasswordMismatch {
@@ -87,4 +87,12 @@ error_chain! {
             display("Filename not proper UTF-8: ‘{}’.", filename.display())
         }
     }
+}
+
+pub fn syntax_error<S1: Into<String>, S2: Into<String>>(class: S1, thing: S2) -> Error {
+    ErrorKind::SyntaxError(class.into(), thing.into()).into()
+}
+
+pub fn no_command_given() -> Error {
+    ErrorKind::NoCommandGiven.into()
 }
