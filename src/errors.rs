@@ -14,6 +14,9 @@ pub struct JsonError {
     pub message: String,
 }
 
+#[derive(Debug)]
+pub struct RemoteFiles(pub Vec<String>);
+
 error_chain! {
     foreign_links {
         Clap(clap::Error);
@@ -86,6 +89,16 @@ error_chain! {
             description("filename not UTF-8")
             display("Filename not proper UTF-8: ‘{}’.", filename.display())
         }
+
+        MultipleSourcesOneDestination(rpat: RemotePattern) {
+            description("multiple sources one destination")
+            display("Multiple source files cannot be copies to one destination file: ‘{}’", rpat)
+        }
+
+        DestinationPatternIsMultiple(rpat: RemotePattern, rfiles: RemoteFiles) {
+            description("destination pattern is multiple")
+            display("Destination pattern ‘{}’ resolves to multiple remote files:\n{}", rpat, rfiles)
+        }
     }
 }
 
@@ -95,4 +108,21 @@ pub fn syntax_error<S1: Into<String>, S2: Into<String>>(class: S1, thing: S2) ->
 
 pub fn no_command_given() -> Error {
     ErrorKind::NoCommandGiven.into()
+}
+
+pub fn dest_pat_is_multiple(rpat: &RemotePattern,
+                            rfile_metas: &[super::messages::FileMeta]) -> Error {
+
+    let rfiles = RemoteFiles(rfile_metas.iter().map(|meta| meta.name.clone()).collect());
+    ErrorKind::DestinationPatternIsMultiple(rpat.clone(), rfiles).into()
+}
+
+impl std::fmt::Display for RemoteFiles {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        for filename in &self.0 {
+            write!(f, " - {}\n", filename)?;
+        }
+
+        Ok(())
+    }
 }

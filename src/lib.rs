@@ -11,7 +11,7 @@ pub mod errors;
 pub mod messages;
 pub mod table;
 
-use self::errors::{Error, ErrorKind, JsonError, Result};
+use self::errors::*;
 use self::config::DotfileLock;
 
 pub struct GscClient {
@@ -139,36 +139,46 @@ impl GscClient {
 
         if dst.pat.is_empty() {
             for src in srcs {
-                match std::fs::File::open(&src) {
+                let filename     = match self.get_base_filename(&src) {
+                    Ok(s)  => s,
                     Err(e) => {
                         ve1!("{}", e);
                         self.had_warning = true;
+                        continue;
                     }
-
-                    Ok(file) => {
-                        let filename     = match self.get_base_filename(&src) {
-                            Ok(s)  => s,
-                            Err(e) => {
-                                ve1!("{}", e);
-                                self.had_warning = true;
-                                continue;
-                            }
-                        };
-                        let encoded      = utf8_percent_encode(filename, PATH_SEGMENT_ENCODE_SET);
-                        let base_uri     = self.get_uri_for_submission_files(user, dst.hw)?;
-                        let uri          = format!{"{}/{}", base_uri, encoded};
-                        let mut request  = self.http.put(&uri);
-                        request.body(file);
-                        v2!("Uploading file ‘{}’...", src.display());
-                        self.send_request(request)?;
-                    }
-                }
+                };
+                self.upload_file(user, src, dst.hw, filename)?;
             }
-
-            v2!("Done.");
         } else {
+            let src = if srcs.len() == 1 {
+                &srcs[0]
+            } else {
+                Err(ErrorKind::MultipleSourcesOneDestination(dst.clone()))?
+            };
 
+            let dsts = self.fetch_file_list(user, dst)?;
+            let dst_filename = match dsts.len() {
+                0 => &dst.pat,
+                1 => &dsts[0].name,
+                _ => Err(dest_pat_is_multiple(dst, &dsts))?,
+            };
+
+            self.upload_file(user, src, dst.hw, dst_filename)?;
         }
+
+        v2!("Done.");
+        Ok(())
+    }
+
+    fn upload_file(&mut self, user: Option<&str>, src: &Path, hw: usize, dst: &str) -> Result<()> {
+        let src_file     = std::fs::File::open(&src)?;
+        let encoded_dst  = utf8_percent_encode(dst, PATH_SEGMENT_ENCODE_SET);
+        let base_uri     = self.get_uri_for_submission_files(user, hw)?;
+        let uri          = format!{"{}/{}", base_uri, encoded_dst};
+        let mut request  = self.http.put(&uri);
+        request.body(src_file);
+        v2!("Uploading file ‘{}’...", src.display());
+        self.send_request(request)?;
 
         Ok(())
     }
@@ -240,12 +250,11 @@ impl GscClient {
 
     pub fn fetch_file_list(&mut self,
                            user: Option<&str>,
-                           hw_number: usize,
-                           pattern: &str)
+                           rpat: &RemotePattern)
         -> Result<Vec<messages::FileMeta>>
     {
-        let matcher      = glob(pattern)?;
-        let uri          = self.get_uri_for_submission_files(user, hw_number)?;
+        let matcher      = glob(&rpat.pat)?;
+        let uri          = self.get_uri_for_submission_files(user, rpat.hw)?;
         let request      = self.http.get(&uri);
         let mut response = self.send_request(request)?;
 
@@ -258,7 +267,7 @@ impl GscClient {
 
     pub fn ls(&mut self, user: Option<&str>, rpat: &RemotePattern) -> Result<()> {
 
-        let files     = self.fetch_file_list(user, rpat.hw, &rpat.pat)?;
+        let files     = self.fetch_file_list(user, &rpat)?;
         let mut table = table::TextTable::new("%r  %l  [%l] %l\n");
 
         if files.is_empty() {
@@ -325,7 +334,7 @@ impl GscClient {
 
     pub fn cat(&mut self, user: Option<&str>, pats: &[RemotePattern]) -> Result<()> {
         for rpat in pats {
-            let files = self.fetch_file_list(user, rpat.hw, &rpat.pat)?;
+            let files = self.fetch_file_list(user, &rpat)?;
 
             if files.is_empty() {
                 let error = Error::from(ErrorKind::NoSuchRemoteFile(rpat.clone()));
@@ -374,7 +383,7 @@ impl GscClient {
 
     pub fn rm(&mut self, user: Option<&str>, pats: &[RemotePattern]) -> Result<()> {
         for rpat in pats {
-            let files = self.fetch_file_list(user, rpat.hw, &rpat.pat)?;
+            let files = self.fetch_file_list(user, &rpat)?;
 
             if files.is_empty() {
                 let error = Error::from(ErrorKind::NoSuchRemoteFile(rpat.clone()));
