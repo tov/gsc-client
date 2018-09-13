@@ -341,7 +341,7 @@ fn parse_hw_file(file_spec: &str, allow_bare: bool) -> Result<RemotePattern> {
 
 fn parse_cp_arg(spec: &str, allow_bare: bool) -> Result<CpArg> {
     if spec.is_empty() {
-        Err(syntax_error("empty file name", spec))?
+        Err(syntax_error("file name", spec))?
     } else if let Some(captures) = re::LOCAL_FILE.captures(spec) {
         let filename = captures.get(1).unwrap().as_str().to_owned();
         Ok(CpArg::Local(filename.into()))
