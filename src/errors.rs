@@ -90,9 +90,9 @@ error_chain! {
             display("Filename not proper UTF-8: ‘{}’.", filename.display())
         }
 
-        MultipleSourcesOneDestination(rpat: RemotePattern) {
+        MultipleSourcesOneDestination(dst: String) {
             description("multiple sources one destination")
-            display("Multiple source files cannot be copies to one destination file: ‘{}’", rpat)
+            display("Multiple source files cannot be copied to one destination file: ‘{}’", dst)
         }
 
         DestinationPatternIsMultiple(rpat: RemotePattern, rfiles: RemoteFiles) {

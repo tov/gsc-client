@@ -108,9 +108,42 @@ pub struct FileMeta {
     pub byte_count:         usize,
     pub media_type:         String,
     pub name:               String,
-    pub purpose:            String,
+    pub purpose:            FilePurpose,
     pub upload_time:        DateTime,
     pub uri:                String,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum FilePurpose {
+    Source,
+    Test,
+    Resource,
+    Log,
+}
+
+impl FilePurpose {
+    pub fn to_char(&self) -> char {
+        use self::FilePurpose::*;
+
+        match self {
+            Source   => 's',
+            Test     => 't',
+            Resource => 'r',
+            Log      => 'l',
+        }
+    }
+
+    pub fn to_dir(&self) -> &str {
+        use self::FilePurpose::*;
+
+        match self {
+            Source   => "src",
+            Test     => "test",
+            Resource => "Resources",
+            Log      => ".",
+        }
+    }
 }
 
 #[derive(Serialize, Debug)]

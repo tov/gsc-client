@@ -3,6 +3,7 @@
 use vlog::*;
 use percent_encoding::{utf8_percent_encode, PATH_SEGMENT_ENCODE_SET};
 use std::collections::{hash_map, HashMap};
+use std::io;
 use std::mem::replace;
 use std::path::{Path, PathBuf};
 
@@ -106,20 +107,77 @@ impl GscClient {
         }
     }
 
-    pub fn cp_dn(&mut self, _user: Option<&str>, raw_srcs: &[CpArg], dst: &Path)
+    pub fn cp_dn(&mut self, user: Option<&str>, raw_srcs: &[CpArg], dst: &Path)
               -> Result<()> {
 
-        let mut srcs = Vec::new();
+        let mut src_rpats = Vec::new();
 
         for src in raw_srcs {
             match src {
                 CpArg::Local(filename) =>
                     Err(ErrorKind::CannotCopyLocalToLocal(filename.clone(), dst.to_owned()))?,
                 CpArg::Remote(rpat)    =>
-                    srcs.push(rpat),
+                    src_rpats.push(rpat),
             }
         }
 
+        enum DstType {
+            Dir,
+            File,
+            DoesNotExist,
+        }
+
+        let dst_type = match dst.metadata() {
+            Err(e) =>
+                match e.kind() {
+                    io::ErrorKind::NotFound => DstType::DoesNotExist,
+                    _                       => Err(e)?,
+                }
+            Ok(metadata) =>
+                if metadata.is_dir() {
+                    DstType::Dir
+                } else {
+                    DstType::File
+                }
+        };
+
+        let mut src_files = Vec::new();
+
+        for src_rpat in &src_rpats {
+            let whole_hw = src_rpat.pat.is_empty();
+            src_files.extend(
+                self.fetch_file_list(user, src_rpat)?
+                    .into_iter()
+                    .map(|meta| {
+                        let hw  = src_rpat.hw;
+                        let pat = meta.name.clone();
+                        (meta, whole_hw, RemotePattern { hw, pat })
+                    }));
+        }
+
+        match dst_type {
+            DstType::File if src_files.len() == 1 =>
+                self.download_file(&src_files[0].2, &src_files[0].0.uri, dst)?,
+
+            DstType::File =>
+                Err(ErrorKind::MultipleSourcesOneDestination(dst.display().to_string()))?,
+
+            DstType::DoesNotExist if src_files.len() == 1 && !ends_in_slash(dst) =>
+                self.download_file(&src_files[0].2, &src_files[0].0.uri, dst)?,
+
+            _ => {
+                for (meta, whole_hw, rpat) in &src_files {
+                    let mut file_dst = dst.to_owned();
+                    if *whole_hw {
+                        file_dst.push(meta.purpose.to_dir())
+                    }
+                    file_dst.push(&meta.name);
+                    self.download_file(rpat, &meta.uri, &file_dst)?;
+                }
+            }
+        }
+
+        v2!("Done.");
         Ok(())
     }
 
@@ -140,45 +198,66 @@ impl GscClient {
         if dst.pat.is_empty() {
             for src in srcs {
                 let filename     = match self.get_base_filename(&src) {
-                    Ok(s)  => s,
+                    Ok(s)  => s.to_owned(),
                     Err(e) => {
                         ve1!("{}", e);
                         self.had_warning = true;
                         continue;
                     }
                 };
-                self.upload_file(user, src, dst.hw, filename)?;
+                self.upload_file(user, src,
+                                 &RemotePattern { hw: dst.hw, pat: filename })?;
             }
         } else {
             let src = if srcs.len() == 1 {
                 &srcs[0]
             } else {
-                Err(ErrorKind::MultipleSourcesOneDestination(dst.clone()))?
+                Err(ErrorKind::MultipleSourcesOneDestination(dst.to_string()))?
             };
 
             let dsts = self.fetch_file_list(user, dst)?;
             let dst_filename = match dsts.len() {
-                0 => &dst.pat,
-                1 => &dsts[0].name,
+                0 => dst.pat.to_owned(),
+                1 => dsts[0].name.to_owned(),
                 _ => Err(dest_pat_is_multiple(dst, &dsts))?,
             };
 
-            self.upload_file(user, src, dst.hw, dst_filename)?;
+            self.upload_file(user, src, &RemotePattern { hw: dst.hw, pat: dst_filename })?;
         }
 
         v2!("Done.");
         Ok(())
     }
 
-    fn upload_file(&mut self, user: Option<&str>, src: &Path, hw: usize, dst: &str) -> Result<()> {
+    fn upload_file(&mut self, user: Option<&str>, src: &Path, dst: &RemotePattern) -> Result<()> {
         let src_file     = std::fs::File::open(&src)?;
-        let encoded_dst  = utf8_percent_encode(dst, PATH_SEGMENT_ENCODE_SET);
-        let base_uri     = self.get_uri_for_submission_files(user, hw)?;
+        let encoded_dst  = utf8_percent_encode(&dst.pat, PATH_SEGMENT_ENCODE_SET);
+        let base_uri     = self.get_uri_for_submission_files(user, dst.hw)?;
         let uri          = format!{"{}/{}", base_uri, encoded_dst};
         let mut request  = self.http.put(&uri);
         request.body(src_file);
-        v2!("Uploading file ‘{}’...", src.display());
+        v2!("Uploading ‘{}’ -> ‘{}’...", src.display(), dst);
         self.send_request(request)?;
+
+        Ok(())
+    }
+
+    fn download_file(&mut self, src: &RemotePattern, rel_uri: &str, dst: &Path) -> Result<()> {
+        if let Some(dir) = dst.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(dst)?;
+
+        let uri          = format!("{}{}", self.config.get_endpoint(), rel_uri);
+        let request      = self.http.get(&uri);
+        ve2!("Downloading ‘{}’ -> ‘{}’...", src, dst.display());
+        let mut response = self.send_request(request)?;
+        response.copy_to(&mut file)?;
 
         Ok(())
     }
@@ -281,7 +360,7 @@ impl GscClient {
                 table::Row::new()
                     .add_cell(file.byte_count)
                     .add_cell(&file.upload_time)
-                    .add_cell(&file.purpose[..1])
+                    .add_cell(file.purpose.to_char())
                     .add_cell(&file.name));
         }
 
@@ -477,6 +556,13 @@ impl GscClient {
         }
 
         Ok(())
+    }
+}
+
+fn ends_in_slash(path: &Path) -> bool {
+    match path.to_str() {
+        Some(s) => s.ends_with('/'),
+        None    => false,
     }
 }
 
