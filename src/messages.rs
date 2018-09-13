@@ -113,3 +113,7 @@ pub struct FileMeta {
     pub uri:                String,
 }
 
+#[derive(Serialize, Debug)]
+pub struct PasswordChange {
+    pub password:           String,
+}

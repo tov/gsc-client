@@ -15,6 +15,7 @@ enum Command {
     Create(String),
     Deauth,
     Ls(Option<String>, usize, String),
+    Passwd(Option<String>),
     Status(Option<String>, usize),
 }
 
@@ -29,6 +30,7 @@ fn do_it() -> Result<()> {
         Command::Create(username)  => client.create(&username)?,
         Command::Deauth            => client.deauth(),
         Command::Ls(user, hw, pat) => client.ls(bs(&user), hw, &pat)?,
+        Command::Passwd(user)      => client.passwd(bs(&user))?,
         Command::Status(user, hw)  => client.status(bs(&user), hw)?,
     }
 
@@ -86,6 +88,15 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 .arg(Arg::with_name("HW")
                     .help("The homework to list, e.g. ‘hw3’")
                     .required(true)))
+            .subcommand(SubCommand::with_name("passwd")
+                .about("Changes the password")
+                .add_common()
+                .arg(Arg::with_name("USER")
+                    .long("user")
+                    .short("u")
+                    .help("The user whose password to change")
+                    .takes_value(true)
+                    .required(false)))
             .subcommand(SubCommand::with_name("status")
                 .about("Retrieves submission status")
                 .add_common()
@@ -126,6 +137,12 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             let user = submatches.value_of("USER").map(str::to_owned);
             let (hw_number, pattern) = parse_hw_spec(ls_spec)?;
             Ok(Command::Ls(user, hw_number, pattern))
+        }
+
+        else if let Some(submatches) = matches.subcommand_matches("passwd") {
+            process_common(submatches, config);
+            let user = submatches.value_of("USER").map(str::to_owned);
+            Ok(Command::Passwd(user))
         }
 
         else if let Some(submatches) = matches.subcommand_matches("status") {

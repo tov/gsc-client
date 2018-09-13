@@ -54,7 +54,7 @@ impl GscClient {
         self.config.username = username.to_owned();
 
         loop {
-            let password = self.prompt_password("Password")?;
+            let password = prompt_password("Password", username)?;
             let mut response = self.http.get(&uri)
                 .basic_auth(username, Some(password))
                 .send()?;
@@ -79,10 +79,7 @@ impl GscClient {
     fn fetch_submissions(&mut self, user_option: Option<&str>)
         -> Result<Vec<messages::SubmissionShort>> {
 
-        let user         = match &user_option {
-            Some(user) => user,
-            None       => self.config.get_username(),
-        };
+        let user         = self.select_user(user_option);
         let uri          = format!("{}/api/users/{}/submissions", self.config.endpoint, user);
         let request      = self.http.get(&uri);
         let mut response = self.send_request(request)?;
@@ -198,19 +195,26 @@ impl GscClient {
     pub fn create(&mut self, username: &str) -> Result<()> {
         self.config.username = username.to_owned();
 
-        let password1 = self.prompt_password("New password")?;
-        let password2 = self.prompt_password("Confirm password")?;
+        let password = get_matching_passwords(username)?;
+        let uri      = format!("{}/api/users", self.config.endpoint);
 
-        if password1 != password2 {
-            Err(errors::ErrorKind::PasswordMismatch)?;
-        }
-
-        let uri = format!("{}/api/users", self.config.endpoint);
         ve2!("> Sending request to {}", uri);
         let mut response = self.http.post(&uri)
-            .basic_auth(username, Some(password1))
+            .basic_auth(username, Some(password))
             .send()?;
         self.handle_response(&mut response)?;
+
+        Ok(())
+    }
+
+    pub fn passwd(&mut self, user_option: Option<&str>) -> Result<()> {
+        let user         = self.select_user(user_option);
+        let uri          = format!("{}/api/users/{}", self.config.endpoint, user);
+        let password     = get_matching_passwords(user)?;
+        let message      = messages::PasswordChange { password };
+        let mut request  = self.http.patch(&uri);
+        request.json(&message);
+        self.send_request(request)?;
 
         Ok(())
     }
@@ -220,6 +224,13 @@ impl GscClient {
         let request      = self.http.get(&uri);
         let mut response = self.send_request(request)?;
         Ok(response.text()?)
+    }
+
+    fn select_user<'a>(&'a self, username_option: Option<&'a str>) -> &'a str {
+        match username_option {
+            Some(s) => s,
+            None    => self.config.get_username(),
+        }
     }
 
     fn send_request(&mut self, mut req_builder: reqwest::RequestBuilder)
@@ -246,12 +257,6 @@ impl GscClient {
         }
     }
 
-    fn prompt_password(&self, prompt: &str) -> Result<String> {
-        let prompt   = format!("{} for {}: ", prompt, self.config.get_username());
-        let password = rpassword::prompt_password_stderr(&prompt)?;
-        Ok(password)
-    }
-
     fn prepare_cookie(&self, request: &mut reqwest::RequestBuilder) -> Result<()> {
         let cookie = self.config.get_cookie_header()?;
         ve2!("> Sending cookie: {}", cookie);
@@ -271,5 +276,22 @@ impl GscClient {
 
         false
     }
+}
+
+fn get_matching_passwords(username: &str) -> Result<String> {
+    let password1 = prompt_password("New password", username)?;
+    let password2 = prompt_password("Confirm password", username)?;
+
+    if password1 == password2 {
+        Ok(password1)
+    } else {
+        Err(errors::ErrorKind::PasswordMismatch)?
+    }
+}
+
+fn prompt_password(prompt: &str, username: &str) -> Result<String> {
+    let prompt   = format!("{} for {}: ", prompt, username);
+    let password = rpassword::prompt_password_stderr(&prompt)?;
+    Ok(password)
 }
 
