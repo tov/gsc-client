@@ -37,6 +37,11 @@ pub fn parse_cookies(chunks: &[String]) -> Option<(String, String)> {
     None
 }
 
+fn glob(pattern: &str) -> Result<globset::GlobMatcher> {
+    let real_pattern = if pattern.is_empty() { "*" } else { pattern };
+    Ok(globset::Glob::new(real_pattern)?.compile_matcher())
+}
+
 impl GscClient {
     pub fn new(config: config::Config) -> Result<Self> {
         let http = reqwest::Client::new();
@@ -46,7 +51,7 @@ impl GscClient {
     pub fn auth(&mut self, username: &str) -> Result<()> {
         let uri = format!("{}/api/users/{}", self.config.endpoint, username);
 
-        self.config.username = Some(username.to_owned());
+        self.config.username = username.to_owned();
 
         loop {
             let password = self.prompt_password("Password")?;
@@ -67,16 +72,16 @@ impl GscClient {
 
     pub fn deauth(&mut self) {
         self.config.cookie   = None;
-        self.config.username = None;
+        self.config.username = String::new();
         self.config.save     = true;
     }
 
-    fn ls_submissions(&mut self, user_option: Option<String>)
+    fn fetch_submissions(&mut self, user_option: Option<String>)
         -> Result<Vec<messages::SubmissionShort>> {
 
         let user         = match &user_option {
             Some(user) => &user,
-            None       => self.config.get_username()?,
+            None       => self.config.get_username(),
         };
         let uri          = format!("{}/api/users/{}/submissions", self.config.endpoint, user);
         let request      = self.http.get(&uri);
@@ -88,7 +93,7 @@ impl GscClient {
     fn get_uri_for_submission(&mut self, user: Option<String>, number: usize)
         -> Result<String> {
 
-        let submissions = self.ls_submissions(user)?;
+        let submissions = self.fetch_submissions(user)?;
 
         for submission in &submissions {
             if submission.assignment_number == number {
@@ -105,14 +110,31 @@ impl GscClient {
         self.get_uri_for_submission(user, number).map(|uri| uri + "/files")
     }
 
-    pub fn ls_submission(&mut self, user: Option<String>, number: usize) -> Result<()>
+    pub fn fetch_file_list(&mut self,
+                           user: Option<String>,
+                           hw_number: usize,
+                           pattern: String)
+        -> Result<Vec<messages::FileMeta>>
     {
-        let uri          = self.get_uri_for_submission_files(user, number)?;
+        let matcher      = glob(&pattern)?;
+        let uri          = self.get_uri_for_submission_files(user, hw_number)?;
         let request      = self.http.get(&uri);
         let mut response = self.send_request(request)?;
 
         let files: Vec<messages::FileMeta> = response.json()?;
 
+        Ok(files.into_iter()
+               .filter(|file| matcher.is_match(&file.name))
+               .collect())
+    }
+
+    pub fn ls(&mut self,
+              user: Option<String>,
+              number: usize,
+              pattern: String)
+        -> Result<()> {
+
+        let files     = self.fetch_file_list(user, number, pattern)?;
         let mut table = table::TextTable::new("%r  %l  [%l] %l\n");
 
         for file in &files {
@@ -174,7 +196,7 @@ impl GscClient {
     }
 
     pub fn create(&mut self, username: &str) -> Result<()> {
-        self.config.username = Some(username.to_owned());
+        self.config.username = username.to_owned();
 
         let password1 = self.prompt_password("New password")?;
         let password2 = self.prompt_password("Confirm password")?;
@@ -225,7 +247,7 @@ impl GscClient {
     }
 
     fn prompt_password(&self, prompt: &str) -> Result<String> {
-        let prompt   = format!("{} for {}: ", prompt, self.config.get_username()?);
+        let prompt   = format!("{} for {}: ", prompt, self.config.get_username());
         let password = rpassword::prompt_password_stderr(&prompt)?;
         Ok(password)
     }

@@ -14,6 +14,7 @@ pub struct JsonError {
 error_chain! {
     foreign_links {
         Clap(clap::Error);
+        Globset(globset::Error);
         Io(std::io::Error);
         Reqwest(reqwest::Error);
         SerdeYaml(serde_yaml::Error);

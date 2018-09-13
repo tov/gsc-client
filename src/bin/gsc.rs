@@ -14,7 +14,7 @@ enum Command {
     Auth(String),
     Create(String),
     Deauth,
-    Ls(Option<String>, usize),
+    Ls(Option<String>, usize, String),
     Status(Option<String>, usize),
 }
 
@@ -25,11 +25,11 @@ fn do_it() -> Result<()> {
     let mut client = gsc_client::GscClient::new(config)?;
 
     match command {
-        Command::Auth(username)   => client.auth(&username)?,
-        Command::Create(username) => client.create(&username)?,
-        Command::Deauth           => client.deauth(),
-        Command::Ls(user, hw)     => client.ls_submission(user, hw)?,
-        Command::Status(user, hw) => client.status(user, hw)?,
+        Command::Auth(username)    => client.auth(&username)?,
+        Command::Create(username)  => client.create(&username)?,
+        Command::Deauth            => client.deauth(),
+        Command::Ls(user, hw, pat) => client.ls(user, hw, pat)?,
+        Command::Status(user, hw)  => client.status(user, hw)?,
     }
 
     Ok(())
@@ -120,7 +120,8 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             process_common(submatches, config);
             let ls_spec = submatches.value_of("HW").unwrap();
             let user = submatches.value_of("USER").map(str::to_owned);
-            Ok(Command::Ls(user, parse_hw_spec(ls_spec)?))
+            let (hw_number, pattern) = parse_hw_spec(ls_spec)?;
+            Ok(Command::Ls(user, hw_number, pattern))
         }
 
         else if let Some(submatches) = matches.subcommand_matches("status") {
@@ -136,23 +137,23 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
     }
 }
 
-fn parse_hw_spec(hw_spec: &str) -> Result<usize> {
+fn parse_hw_spec(hw_spec: &str) -> Result<(usize, String)> {
     lazy_static! {
-        static ref HW_RE: regex::Regex = regex::Regex::new(r"hw(\d):?").unwrap();
+        static ref HW_RE: regex::Regex = regex::Regex::new(r"hw(\d+)(?::(.*))?").unwrap();
     }
 
-    if let Some(i) = HW_RE.captures(hw_spec)
-        .and_then(|captures| captures.get(1))
-        .and_then(|s| s.as_str().parse().ok()) {
-        Ok(i)
-    } else {
-        Err(ErrorKind::SyntaxError("homework spec".to_owned()))?
-    }
+    let captures  = HW_RE.captures(hw_spec)
+        .ok_or_else(|| ErrorKind::SyntaxError("homework spec".to_owned()))?;
+    let capture1  = captures.get(1).unwrap().as_str();
+    let capture2  = captures.get(2).map(|c| c.as_str());
+    let hw_number = capture1.parse().unwrap();
+    let pattern   = capture2.unwrap_or("").to_owned();
+    Ok((hw_number, pattern))
 }
 
 fn parse_status_spec(status_spec: &str) -> Result<usize> {
     lazy_static! {
-        static ref HW_RE: regex::Regex = regex::Regex::new(r"hw(\d)").unwrap();
+        static ref HW_RE: regex::Regex = regex::Regex::new(r"hw(\d+)").unwrap();
     }
 
     if let Some(i) = HW_RE.captures(status_spec)

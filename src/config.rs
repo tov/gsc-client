@@ -16,7 +16,7 @@ const DOTFILE_NAME: &str = ".gsclogin";
 #[derive(Debug)]
 pub struct Config {
     pub dotfile:    Option<PathBuf>,
-    pub username:   Option<String>,
+    pub username:   String,
     pub cookie:     Option<(String, String)>,
     pub endpoint:   String,
     pub save:       bool,
@@ -46,18 +46,15 @@ impl Config {
 
         Config {
             dotfile,
-            username:   None,
+            username:   String::new(),
             cookie:     None,
             endpoint:   API_ENDPOINT.to_owned(),
             save:       false,
         }
     }
 
-    pub fn get_username(&self) -> Result<&str> {
-        match &self.username {
-            Some(username) => Ok(&username),
-            _              => Err(ErrorKind::LoginPlease)?,
-        }
+    pub fn get_username(&self) -> &str {
+        &self.username
     }
 
     pub fn get_cookie(&self) -> Result<(&str, &str)> {
@@ -98,7 +95,7 @@ impl Config {
             })?;
 
         let Dotfile { username, cookie, endpoint } = parsed;
-        if !username.is_empty() { self.username = Some(username); }
+        if !username.is_empty() { self.username = username; }
         if !cookie.is_empty() { self.cookie = super::parse_cookie(&cookie); }
         if !endpoint.is_empty() { self.endpoint = endpoint; }
 
@@ -109,10 +106,10 @@ impl Config {
         if !self.save { return Ok(()); }
 
         let dotfile_name = self.get_dotfile()?;
-        let username = self.get_username().unwrap_or("").to_owned();
+        let username = self.get_username().to_owned();
         let cookie = match &self.cookie {
             Some((key, value)) => format!("{}={}", key, value),
-            None               => "".to_owned(),
+            None               => String::new(),
         };
         let endpoint = self.endpoint.clone();
         let contents = serde_yaml::to_string(&Dotfile { username, cookie, endpoint })?;
