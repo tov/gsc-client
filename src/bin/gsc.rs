@@ -11,12 +11,12 @@ fn main() {
 }
 
 enum Command {
-    Auth(String),
-    Create(String),
+    Auth{username: String},
+    Create{username: String},
     Deauth,
-    Ls(Option<String>, usize, String),
-    Passwd(Option<String>),
-    Status(Option<String>, usize),
+    Ls{user: Option<String>, hw: usize, pat: String},
+    Passwd{user: Option<String>},
+    Status{user: Option<String>, hw: usize},
 }
 
 fn do_it() -> Result<()> {
@@ -26,12 +26,12 @@ fn do_it() -> Result<()> {
     let mut client = gsc_client::GscClient::new(config)?;
 
     match command {
-        Command::Auth(username)    => client.auth(&username)?,
-        Command::Create(username)  => client.create(&username)?,
+        Command::Auth{username}    => client.auth(&username)?,
+        Command::Create{username}  => client.create(&username)?,
         Command::Deauth            => client.deauth(),
-        Command::Ls(user, hw, pat) => client.ls(bs(&user), hw, &pat)?,
-        Command::Passwd(user)      => client.passwd(bs(&user))?,
-        Command::Status(user, hw)  => client.status(bs(&user), hw)?,
+        Command::Ls{user, hw, pat} => client.ls(bs(&user), hw, &pat)?,
+        Command::Passwd{user}      => client.passwd(bs(&user))?,
+        Command::Status{user, hw}  => client.status(bs(&user), hw)?,
     }
 
     Ok(())
@@ -117,14 +117,14 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
 
         if let Some(submatches) = matches.subcommand_matches("auth") {
             process_common(submatches, config);
-            let username = submatches.value_of("USER").unwrap();
-            Ok(Command::Auth(username.to_owned()))
+            let username = submatches.value_of("USER").unwrap().to_owned();
+            Ok(Command::Auth{username})
         }
 
         else if let Some(submatches) = matches.subcommand_matches("create") {
             process_common(submatches, config);
-            let username = submatches.value_of("USER").unwrap();
-            Ok(Command::Create(username.to_owned()))
+            let username = submatches.value_of("USER").unwrap().to_owned();
+            Ok(Command::Create{username})
         }
 
         else if let Some(_) = matches.subcommand_matches("deauth") {
@@ -135,21 +135,22 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             process_common(submatches, config);
             let ls_spec = submatches.value_of("HW").unwrap();
             let user = submatches.value_of("USER").map(str::to_owned);
-            let (hw_number, pattern) = parse_hw_spec(ls_spec)?;
-            Ok(Command::Ls(user, hw_number, pattern))
+            let (hw, pat) = parse_hw_spec(ls_spec)?;
+            Ok(Command::Ls{user, hw, pat})
         }
 
         else if let Some(submatches) = matches.subcommand_matches("passwd") {
             process_common(submatches, config);
             let user = submatches.value_of("USER").map(str::to_owned);
-            Ok(Command::Passwd(user))
+            Ok(Command::Passwd{user})
         }
 
         else if let Some(submatches) = matches.subcommand_matches("status") {
             process_common(submatches, config);
             let ls_spec = submatches.value_of("HW").unwrap();
             let user = submatches.value_of("USER").map(str::to_owned);
-            Ok(Command::Status(user, parse_status_spec(ls_spec)?))
+            let hw = parse_status_spec(ls_spec)?;
+            Ok(Command::Status{user, hw})
         }
 
         else {
