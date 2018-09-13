@@ -164,8 +164,15 @@ impl CookieLock {
         self.dirty = true;
     }
 
+    pub fn deauth(&mut self) {
+        self.key.clear();
+        self.value.clear();
+        self.dirty = true;
+        self.dotfile.username.clear();
+    }
+
     fn flush_cookie(&mut self) -> Result<()> {
-        if self.dirty {
+        let r1 = if self.dirty {
             self.dotfile.cookie = if self.key.is_empty() {
                 String::new()
             } else {
@@ -173,11 +180,15 @@ impl CookieLock {
             };
 
             self.file.set_len(0)?;
-            let r1 = serde_yaml::to_writer(&mut self.file, &self.dotfile);
-            let r2 = self.file.unlock();
-            r1?; r2?
-        }
-        
+            serde_yaml::to_writer(&mut self.file, &self.dotfile)
+        } else {
+            Ok(())
+        };
+
+        let r2 = self.file.unlock();
+
+        r1?; r2?;
+
         Ok(())
     }
 }

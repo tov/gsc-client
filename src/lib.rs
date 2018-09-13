@@ -82,9 +82,8 @@ impl GscClient {
     }
 
     pub fn deauth(&mut self) -> Result<()> {
-        self.config.set_username(String::new());
         let mut cookie_lock = self.config.new_cookie()?;
-        cookie_lock.set_cookie(String::new(), String::new());
+        cookie_lock.deauth();
         Ok(())
     }
 
