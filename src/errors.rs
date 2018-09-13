@@ -1,6 +1,9 @@
+use super::RemotePattern;
+
 use error_chain::*;
-use reqwest;
 use serde_derive::{Serialize, Deserialize};
+
+use std::path::PathBuf;
 
 /// This is the format of error messages produced by the server.
 #[derive(Serialize, Deserialize, Debug)]
@@ -58,9 +61,30 @@ error_chain! {
             display("Please specify a configuration file.")
         }
 
-        NoSuchRemoteFile(hw: usize, pat: String) {
+        NoSuchRemoteFile(rpat: RemotePattern) {
             description("no such remote file")
-            display("No remote files matching pattern ‘hw{}:{}’.", hw, pat)
+            display("No remote files matching pattern ‘{}’.", rpat)
+        }
+
+        CannotCopyLocalToLocal(src: PathBuf, dst: PathBuf) {
+            description("cannot copy local to local")
+            display("Cannot copy local file ({}) to local destination ({}).",
+                    src.display(), dst.display())
+        }
+
+        CannotCopyRemoteToRemote(src: RemotePattern, dst: RemotePattern) {
+            description("cannot copy remote to remote")
+            display("Cannot copy remote file ({}) to remote destination ({}).", src, dst)
+        }
+
+        BadLocalPath(filename: PathBuf) {
+            description("bad local path")
+            display("Not a well-formed local file path: ‘{}’.", filename.display())
+        }
+
+        FilenameNotUtf8(filename: PathBuf) {
+            description("filename not UTF-8")
+            display("Filename not proper UTF-8: ‘{}’.", filename.display())
         }
     }
 }

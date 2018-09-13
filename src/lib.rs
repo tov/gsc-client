@@ -1,6 +1,10 @@
+#![recursion_limit = "128"]
+
 use vlog::*;
+use percent_encoding::{utf8_percent_encode, PATH_SEGMENT_ENCODE_SET};
 use std::collections::{hash_map, HashMap};
 use std::mem::replace;
+use std::path::{Path, PathBuf};
 
 pub mod config;
 pub mod errors;
@@ -17,9 +21,15 @@ pub struct GscClient {
     had_warning:        bool,
 }
 
+#[derive(Clone, Debug)]
 pub struct RemotePattern {
     pub hw:     usize,
     pub pat:    String,
+}
+
+pub enum CpArg {
+    Local(PathBuf),
+    Remote(RemotePattern),
 }
 
 pub (crate) fn parse_cookie(cookie: &str) -> Option<(String, String)> {
@@ -83,6 +93,92 @@ impl GscClient {
                     eprintln!("{}", e),
                 e =>
                     e?,
+            }
+        }
+    }
+
+    pub fn cp(&mut self, user: Option<&str>, srcs: &[CpArg], dst: &CpArg)
+        -> Result<()> {
+
+        match dst {
+            CpArg::Local(filename) => self.cp_dn(user, srcs, filename),
+            CpArg::Remote(rpat)    => self.cp_up(user, srcs, rpat),
+        }
+    }
+
+    pub fn cp_dn(&mut self, _user: Option<&str>, raw_srcs: &[CpArg], dst: &Path)
+              -> Result<()> {
+
+        let mut srcs = Vec::new();
+
+        for src in raw_srcs {
+            match src {
+                CpArg::Local(filename) =>
+                    Err(ErrorKind::CannotCopyLocalToLocal(filename.clone(), dst.to_owned()))?,
+                CpArg::Remote(rpat)    =>
+                    srcs.push(rpat),
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn cp_up(&mut self, user: Option<&str>, raw_srcs: &[CpArg], dst: &RemotePattern)
+                 -> Result<()> {
+
+        let mut srcs = Vec::new();
+
+        for src in raw_srcs {
+            match src {
+                CpArg::Local(filename) =>
+                    srcs.push(filename),
+                CpArg::Remote(rpat)    =>
+                    Err(ErrorKind::CannotCopyRemoteToRemote(rpat.clone(), dst.clone()))?
+            }
+        }
+
+        if dst.pat.is_empty() {
+            for src in srcs {
+                match std::fs::File::open(&src) {
+                    Err(e) => {
+                        ve1!("{}", e);
+                        self.had_warning = true;
+                    }
+
+                    Ok(file) => {
+                        let filename     = match self.get_base_filename(&src) {
+                            Ok(s)  => s,
+                            Err(e) => {
+                                ve1!("{}", e);
+                                self.had_warning = true;
+                                continue;
+                            }
+                        };
+                        let encoded      = utf8_percent_encode(filename, PATH_SEGMENT_ENCODE_SET);
+                        let base_uri     = self.get_uri_for_submission_files(user, dst.hw)?;
+                        let uri          = format!{"{}/{}", base_uri, encoded};
+                        let mut request  = self.http.put(&uri);
+                        request.body(file);
+                        v2!("Uploading file ‘{}’...", src.display());
+                        self.send_request(request)?;
+                    }
+                }
+            }
+
+            v2!("Done.");
+        } else {
+
+        }
+
+        Ok(())
+    }
+
+    fn get_base_filename<'a>(&mut self, path: &'a Path) -> Result<&'a str> {
+        match path.file_name() {
+            None         => Err(ErrorKind::BadLocalPath(path.to_owned()).into()),
+            Some(os_str) => match os_str.to_str() {
+                None         => Err(ErrorKind::FilenameNotUtf8(path.to_owned()).into()),
+                Some(s)      => Ok(s),
             }
         }
     }
@@ -160,17 +256,13 @@ impl GscClient {
                .collect())
     }
 
-    pub fn ls(&mut self,
-              user: Option<&str>,
-              number: usize,
-              pattern: &str)
-        -> Result<()> {
+    pub fn ls(&mut self, user: Option<&str>, rpat: &RemotePattern) -> Result<()> {
 
-        let files     = self.fetch_file_list(user, number, pattern)?;
+        let files     = self.fetch_file_list(user, rpat.hw, &rpat.pat)?;
         let mut table = table::TextTable::new("%r  %l  [%l] %l\n");
 
         if files.is_empty() {
-            return Err(Error::from(ErrorKind::NoSuchRemoteFile(number, pattern.to_owned())));
+            return Err(Error::from(ErrorKind::NoSuchRemoteFile(rpat.clone())));
         }
 
         for file in &files {
@@ -232,11 +324,11 @@ impl GscClient {
     }
 
     pub fn cat(&mut self, user: Option<&str>, pats: &[RemotePattern]) -> Result<()> {
-        for RemotePattern { hw, pat } in pats {
-            let files = self.fetch_file_list(user, *hw, pat)?;
+        for rpat in pats {
+            let files = self.fetch_file_list(user, rpat.hw, &rpat.pat)?;
 
             if files.is_empty() {
-                let error = Error::from(ErrorKind::NoSuchRemoteFile(*hw, pat.to_owned()));
+                let error = Error::from(ErrorKind::NoSuchRemoteFile(rpat.clone()));
                 ve1!("{}", error);
                 self.had_warning = true;
             }
@@ -258,7 +350,7 @@ impl GscClient {
         let password = get_matching_passwords(username)?;
         let uri      = format!("{}/api/users", self.config.get_endpoint());
 
-        ve2!("> Sending request to {}", uri);
+        ve3!("> Sending request to {}", uri);
         let mut response = self.http.post(&uri)
             .basic_auth(username, Some(password))
             .send()?;
@@ -281,11 +373,11 @@ impl GscClient {
     }
 
     pub fn rm(&mut self, user: Option<&str>, pats: &[RemotePattern]) -> Result<()> {
-        for RemotePattern { hw, pat } in pats {
-            let files = self.fetch_file_list(user, *hw, pat)?;
+        for rpat in pats {
+            let files = self.fetch_file_list(user, rpat.hw, &rpat.pat)?;
 
             if files.is_empty() {
-                let error = Error::from(ErrorKind::NoSuchRemoteFile(*hw, pat.to_owned()));
+                let error = Error::from(ErrorKind::NoSuchRemoteFile(rpat.clone()));
                 ve1!("{}", error);
                 self.had_warning = true;
             }
@@ -330,7 +422,7 @@ impl GscClient {
 
         let cookie_lock = self.prepare_cookie(&mut req_builder)?;
         let request     = req_builder.build()?;
-        ve2!("> Sending request to {}", request.url());
+        ve3!("> Sending request to {}", request.url());
         let mut response = self.http.execute(request)?;
         self.handle_response(&mut response, cookie_lock)?;
         Ok(response)
@@ -340,8 +432,6 @@ impl GscClient {
                        response: &mut reqwest::Response,
                        cookie_lock: DotfileLock)
         -> Result<()> {
-
-        ve3!("< Raw response from server: {:?}", response);
 
         self.save_cookie(response, cookie_lock)?;
 
@@ -356,7 +446,7 @@ impl GscClient {
     fn prepare_cookie(&mut self, request: &mut reqwest::RequestBuilder) -> Result<DotfileLock> {
         let cookie_lock = self.config.lock_dotfile()?;
         let cookie      = cookie_lock.get_cookie_header();
-        ve2!("> Sending cookie: {}", cookie);
+        ve3!("> Sending cookie {}", cookie);
         request.header(cookie);
         Ok(cookie_lock)
     }
@@ -368,7 +458,7 @@ impl GscClient {
 
         if let Some(reqwest::header::SetCookie(chunks)) = response.headers().get() {
             if let Some((key, value)) = parse_cookies(&chunks) {
-                ve2!("< Received cookie: {}={}", key, value);
+                ve3!("< Received cookie {}={}", key, value);
                 cookie_lock.set_cookie(key, value);
             }
         }
@@ -392,5 +482,20 @@ fn prompt_password(prompt: &str, username: &str) -> Result<String> {
     let prompt   = format!("{} for {}: ", prompt, username);
     let password = rpassword::prompt_password_stderr(&prompt)?;
     Ok(password)
+}
+
+impl std::fmt::Display for RemotePattern {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "hw{}:{}", self.hw, self.pat)
+    }
+}
+
+impl std::fmt::Display for CpArg {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            CpArg::Local(filename) => write!(f, ":{}", filename.display()),
+            CpArg::Remote(rp)      => write!(f, "{}", rp),
+        }
+    }
 }
 

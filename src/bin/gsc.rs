@@ -1,6 +1,5 @@
 use gsc_client::*;
 use gsc_client::errors::{ErrorKind, Result};
-use lazy_static::lazy_static;
 use std::process::exit;
 
 fn main() {
@@ -18,12 +17,13 @@ fn main() {
 
 enum Command {
     Auth{user: String},
-    Cat{user: Option<String>, pats: Vec<RemotePattern>},
+    Cat{user: Option<String>, rpats: Vec<RemotePattern>},
     Create{user: String},
+    Cp{user: Option<String>, srcs: Vec<CpArg>, dst: CpArg},
     Deauth,
-    Ls{user: Option<String>, hw: usize, pat: String},
+    Ls{user: Option<String>, rpat: RemotePattern},
     Passwd{user: Option<String>},
-    Rm{user: Option<String>, pats: Vec<RemotePattern>},
+    Rm{user: Option<String>, rpats: Vec<RemotePattern>},
     Status{user: Option<String>, hw: usize},
     Whoami,
 }
@@ -35,16 +35,17 @@ fn do_it() -> Result<bool> {
     let mut client = GscClient::new(config)?;
 
     match command {
-        Command::Auth{user}        => client.auth(&user)?,
-        Command::Cat{user, pats}   => client.cat(bs(&user), &pats)?,
-        Command::Create{user}      => client.create(&user)?,
-        Command::Deauth            => client.deauth()?,
-        Command::Ls{user, hw, pat} => client.ls(bs(&user), hw, &pat)?,
-        Command::Passwd{user}      => client.passwd(bs(&user))?,
-        Command::Rm{user, pats}    => client.rm(bs(&user), &pats)?,
-        Command::Status{user, hw}  => client.status(bs(&user), hw)?,
-        Command::Whoami            => client.whoami()?,
-    }
+        Command::Auth{user}             => client.auth(&user),
+        Command::Cat{user, rpats}       => client.cat(bs(&user), &rpats),
+        Command::Create{user}           => client.create(&user),
+        Command::Cp{user, srcs, dst}    => client.cp(bs(&user), &srcs, &dst),
+        Command::Deauth                 => client.deauth(),
+        Command::Ls{user, rpat}         => client.ls(bs(&user), &rpat),
+        Command::Passwd{user}           => client.passwd(bs(&user)),
+        Command::Rm{user, rpats}        => client.rm(bs(&user), &rpats),
+        Command::Status{user, hw}       => client.status(bs(&user), hw),
+        Command::Whoami                 => client.whoami(),
+    }?;
 
     Ok(client.had_warning())
 }
@@ -87,6 +88,24 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                     .help("The remote files to print")
                     .required(true)
                     .multiple(true)))
+            .subcommand(SubCommand::with_name("cp")
+                .about("Copies files to or from the server")
+                .add_common()
+                .add_user_opt("The user whose files to access")
+                .arg(Arg::with_name("ALL")
+                    .short("a")
+                    .long("all")
+                    .help("Copy all the files in the specified source homework(s)")
+                    .takes_value(false)
+                    .required(false))
+                .arg(Arg::with_name("SRC")
+                    .help("The file(s) to copy")
+                    .required(true)
+                    .multiple(true))
+                .arg(Arg::with_name("DST")
+                    .help("The destination of the file(s)")
+                    .required(true)
+                    .multiple(false)))
             .subcommand(SubCommand::with_name("create")
                 .about("Creates a new account")
                 .add_common()
@@ -145,20 +164,34 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
 
         else if let Some(submatches) = matches.subcommand_matches("cat") {
             process_common(submatches, config);
-            let user     = submatches.value_of("USER").map(str::to_owned);
-            let mut pats = Vec::new();
+            let user      = submatches.value_of("USER").map(str::to_owned);
+            let mut rpats = Vec::new();
 
             for arg in submatches.values_of("FILE").unwrap() {
-                pats.push(parse_remote_pattern(arg, false)?);
+                rpats.push(parse_hw_file(arg, false)?);
             }
 
-            Ok(Command::Cat{user, pats})
+            Ok(Command::Cat{user, rpats})
         }
 
         else if let Some(submatches) = matches.subcommand_matches("create") {
             process_common(submatches, config);
             let user = submatches.value_of("USER").unwrap().to_owned();
             Ok(Command::Create{user})
+        }
+
+        else if let Some(submatches) = matches.subcommand_matches("cp") {
+            process_common(submatches, config);
+            let user     = submatches.value_of("USER").map(str::to_owned);
+            let all      = submatches.is_present("ALL");
+            let mut srcs = Vec::new();
+            let dst      = parse_cp_arg(submatches.value_of("DST").unwrap(), true)?;
+
+            for src in submatches.values_of("SRC").unwrap() {
+                srcs.push(parse_cp_arg(src, all)?);
+            }
+
+            Ok(Command::Cp{user, srcs, dst})
         }
 
         else if let Some(submatches) = matches.subcommand_matches("deauth") {
@@ -170,8 +203,8 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             process_common(submatches, config);
             let user      = submatches.value_of("USER").map(str::to_owned);
             let ls_spec   = submatches.value_of("SPEC").unwrap();
-            let (hw, pat) = parse_hw_or_rp(ls_spec)?;
-            Ok(Command::Ls{user, hw, pat})
+            let (hw, pat) = parse_hw_opt_file(ls_spec)?;
+            Ok(Command::Ls{user, rpat: RemotePattern{hw, pat}})
         }
 
         else if let Some(submatches) = matches.subcommand_matches("passwd") {
@@ -182,15 +215,15 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
 
         else if let Some(submatches) = matches.subcommand_matches("rm") {
             process_common(submatches, config);
-            let user     = submatches.value_of("USER").map(str::to_owned);
-            let all      = submatches.is_present("ALL");
-            let mut pats = Vec::new();
+            let user      = submatches.value_of("USER").map(str::to_owned);
+            let all       = submatches.is_present("ALL");
+            let mut rpats = Vec::new();
 
             for arg in submatches.values_of("FILE").unwrap() {
-                pats.push(parse_remote_pattern(arg, all)?);
+                rpats.push(parse_hw_file(arg, all)?);
             }
 
-            Ok(Command::Rm{user, pats})
+            Ok(Command::Rm{user, rpats})
         }
 
         else if let Some(submatches) = matches.subcommand_matches("status") {
@@ -253,26 +286,21 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
     }
 }
 
-fn parse_hw_or_rp(spec: &str) -> Result<(usize, String)> {
-    lazy_static! {
-        static ref RE: regex::Regex = regex::Regex::new(r"hw(\d+)(?::(.*))?").unwrap();
-    }
+mod re {
+    use lazy_static::lazy_static;
+    use regex::Regex;
 
-    let captures  = RE.captures(spec)
-        .ok_or_else(|| ErrorKind::SyntaxError("homework spec".to_owned()))?;
-    let capture1  = captures.get(1).unwrap().as_str();
-    let capture2  = captures.get(2).map(|c| c.as_str());
-    let hw_number = capture1.parse().unwrap();
-    let pattern   = capture2.unwrap_or("").to_owned();
-    Ok((hw_number, pattern))
+    lazy_static! {
+        pub static ref HW_ONLY:         Regex = Regex::new(r"hw(\d+):?").unwrap();
+        pub static ref HW_OPT_FILE:     Regex = Regex::new(r"hw(\d+)(?::(.*))?").unwrap();
+        pub static ref HW_FILE:         Regex = Regex::new(r"hw(\d+):(.*)").unwrap();
+        pub static ref HW_FILE_NE:      Regex = Regex::new(r"hw(\d+):(.+)").unwrap();
+        pub static ref LOCAL_FILE:      Regex = Regex::new(r":(.+)").unwrap();
+    }
 }
 
 fn parse_hw(spec: &str) -> Result<usize> {
-    lazy_static! {
-        static ref RE: regex::Regex = regex::Regex::new(r"hw(\d+):?").unwrap();
-    }
-
-    if let Some(i) = RE.captures(spec)
+    if let Some(i) = re::HW_ONLY.captures(spec)
         .and_then(|captures| captures.get(1))
         .and_then(|s| s.as_str().parse().ok()) {
         Ok(i)
@@ -281,23 +309,44 @@ fn parse_hw(spec: &str) -> Result<usize> {
     }
 }
 
-fn parse_remote_pattern(file_spec: &str, allow_bare: bool) -> Result<RemotePattern> {
-    use regex::Regex;
+fn parse_hw_opt_file(spec: &str) -> Result<(usize, String)> {
+    let captures  = re::HW_OPT_FILE.captures(spec)
+        .ok_or_else(|| ErrorKind::SyntaxError("homework or file spec".to_owned()))?;
+    let capture1  = captures.get(1).unwrap().as_str();
+    let capture2  = captures.get(2).map(|c| c.as_str());
+    let hw_number = capture1.parse().unwrap();
+    let pattern   = capture2.unwrap_or("").to_owned();
+    Ok((hw_number, pattern))
+}
 
-    lazy_static! {
-        static ref RE_BARE: Regex = Regex::new(r"hw(\d+):(.*)").unwrap();
-        static ref RE_FILE: Regex = Regex::new(r"hw(\d+):(.+)").unwrap();
-    }
+fn parse_hw_file(file_spec: &str, allow_bare: bool) -> Result<RemotePattern> {
+    let re = if allow_bare {&*re::HW_FILE} else {&*re::HW_FILE_NE};
 
-    let re = if allow_bare {&*RE_BARE} else {&*RE_FILE};
+    let err = ||
+        if allow_bare {
+            "remote file or homework spec"
+        } else {
+            "remote file spec"
+        }.to_owned();
 
-    let captures  = re.captures(file_spec)
-        .ok_or_else(|| ErrorKind::SyntaxError(
-            if allow_bare {"remote file or homework spec"}
-                else {"remote file spec"}.to_owned()))?;
+    let captures  = re.captures(file_spec).ok_or_else(err)?;
     let capture1  = captures.get(1).unwrap().as_str();
     let capture2  = captures.get(2).unwrap().as_str();
     let hw        = capture1.parse().unwrap();
     let pat       = capture2.to_owned();
     Ok(RemotePattern{hw, pat})
+}
+
+fn parse_cp_arg(spec: &str, allow_bare: bool) -> Result<CpArg> {
+    if spec.is_empty() {
+        Err(ErrorKind::SyntaxError("empty file name".to_owned()))?
+    } else if let Some(captures) = re::LOCAL_FILE.captures(spec) {
+        let filename = captures.get(1).unwrap().as_str().to_owned();
+        Ok(CpArg::Local(filename.into()))
+    } else if let Some(_) = spec.find(':') {
+        let rp = parse_hw_file(spec, allow_bare)?;
+        Ok(CpArg::Remote(rp))
+    } else {
+        Ok(CpArg::Local(spec.into()))
+    }
 }
