@@ -28,11 +28,15 @@ fn do_it() -> Result<()> {
         Command::Auth(username)    => client.auth(&username)?,
         Command::Create(username)  => client.create(&username)?,
         Command::Deauth            => client.deauth(),
-        Command::Ls(user, hw, pat) => client.ls(user, hw, pat)?,
-        Command::Status(user, hw)  => client.status(user, hw)?,
+        Command::Ls(user, hw, pat) => client.ls(bs(&user), hw, &pat)?,
+        Command::Status(user, hw)  => client.status(bs(&user), hw)?,
     }
 
     Ok(())
+}
+
+fn bs(so: &Option<String>) -> Option<&str> {
+    so.as_ref().map(String::as_str)
 }
 
 struct GscClientApp<'a: 'b, 'b>(clap::App<'a, 'b>);
