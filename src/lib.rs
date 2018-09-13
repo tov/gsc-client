@@ -13,7 +13,8 @@ use self::config::DotfileLock;
 pub struct GscClient {
     http:               reqwest::Client,
     config:             config::Config,
-    submission_uris:    HashMap<String, Vec<Option<String>>>
+    submission_uris:    HashMap<String, Vec<Option<String>>>,
+    had_warning:        bool,
 }
 
 pub struct RemotePattern {
@@ -55,7 +56,12 @@ impl GscClient {
             http:               reqwest::Client::new(),
             config,
             submission_uris:    HashMap::new(),
+            had_warning:        false,
         })
+    }
+
+    pub fn had_warning(&self) -> bool {
+        self.had_warning
     }
 
     pub fn auth(&mut self, username: &str) -> Result<()> {
@@ -232,6 +238,7 @@ impl GscClient {
             if files.is_empty() {
                 let error = Error::from(ErrorKind::NoSuchRemoteFile(*hw, pat.to_owned()));
                 ve1!("{}", error);
+                self.had_warning = true;
             }
 
             for file in files {

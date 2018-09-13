@@ -1,13 +1,18 @@
 use gsc_client::*;
 use gsc_client::errors::{ErrorKind, Result};
 use lazy_static::lazy_static;
+use std::process::exit;
 
 fn main() {
     vlog::set_verbosity_level(1);
 
-    if let Err(err) = do_it() {
-        eprintln!("{}", err);
-        std::process::exit(1);
+    match do_it() {
+        Err(err)  => {
+            eprintln!("{}", err);
+            exit(1);
+        }
+        Ok(true)  => exit(2),
+        Ok(false) => (),
     }
 }
 
@@ -21,7 +26,7 @@ enum Command {
     Status{user: Option<String>, hw: usize},
 }
 
-fn do_it() -> Result<()> {
+fn do_it() -> Result<bool> {
     let mut config = config::Config::new();
     config.load_dotfile()?;
     let command    = GscClientApp::new().process(&mut config)?;
@@ -37,7 +42,7 @@ fn do_it() -> Result<()> {
         Command::Status{user, hw}  => client.status(bs(&user), hw)?,
     }
 
-    Ok(())
+    Ok(client.had_warning())
 }
 
 fn bs(so: &Option<String>) -> Option<&str> {
