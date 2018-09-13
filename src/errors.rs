@@ -50,7 +50,7 @@ error_chain! {
 
         LoginPlease {
             description("login please")
-            display("You are not logged in; use the ‘gsc auth’ command to log in.")
+            display("You are not logged in; use the ‘gsc auth’ command to authenticate.")
         }
 
         NoDotfileGiven {

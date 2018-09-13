@@ -8,6 +8,7 @@ pub mod messages;
 pub mod table;
 
 use self::errors::{Error, ErrorKind, JsonError, Result};
+use self::config::CookieLock;
 
 pub struct GscClient {
     http:               reqwest::Client,
@@ -68,7 +69,8 @@ impl GscClient {
                 .basic_auth(username, Some(password))
                 .send()?;
 
-            match self.handle_response(&mut response) {
+            let cookie_lock = self.config.new_cookie()?;
+            match self.handle_response(&mut response, cookie_lock) {
                 Ok(()) =>
                     return Ok(()),
                 Err(e @ Error(ErrorKind::ServerError(JsonError { status: 401, .. }), _)) =>
@@ -81,7 +83,9 @@ impl GscClient {
 
     pub fn deauth(&mut self) -> Result<()> {
         self.config.set_username(String::new());
-        self.config.set_cookie(None)
+        let mut cookie_lock = self.config.new_cookie()?;
+        cookie_lock.set_cookie(String::new(), String::new());
+        Ok(())
     }
 
     fn fetch_submissions(&mut self, user: &str)
@@ -252,7 +256,8 @@ impl GscClient {
         let mut response = self.http.post(&uri)
             .basic_auth(username, Some(password))
             .send()?;
-        self.handle_response(&mut response)?;
+        let cookie_lock = self.config.new_cookie()?;
+        self.handle_response(&mut response, cookie_lock)?;
 
         Ok(())
     }
@@ -286,18 +291,22 @@ impl GscClient {
     fn send_request(&mut self, mut req_builder: reqwest::RequestBuilder)
         -> Result<reqwest::Response> {
 
-        self.prepare_cookie(&mut req_builder)?;
-        let request = req_builder.build()?;
+        let cookie_lock = self.prepare_cookie(&mut req_builder)?;
+        let request     = req_builder.build()?;
         ve2!("> Sending request to {}", request.url());
         let mut response = self.http.execute(request)?;
-        self.handle_response(&mut response)?;
+        self.handle_response(&mut response, cookie_lock)?;
         Ok(response)
     }
 
-    fn handle_response(&mut self, response: &mut reqwest::Response) -> Result<()> {
+    fn handle_response(&mut self,
+                       response: &mut reqwest::Response,
+                       cookie_lock: CookieLock)
+        -> Result<()> {
+
         ve3!("< Raw response from server: {:?}", response);
 
-        self.save_cookie(response)?;
+        self.save_cookie(response, cookie_lock)?;
 
         if response.status().is_success() {
             Ok(())
@@ -307,18 +316,23 @@ impl GscClient {
         }
     }
 
-    fn prepare_cookie(&mut self, request: &mut reqwest::RequestBuilder) -> Result<()> {
-        let cookie = self.config.get_cookie_header()?;
+    fn prepare_cookie(&mut self, request: &mut reqwest::RequestBuilder) -> Result<CookieLock> {
+        let cookie_lock = self.config.lock_cookie()?;
+        let cookie      = cookie_lock.get_cookie_header();
         ve2!("> Sending cookie: {}", cookie);
         request.header(cookie);
-        Ok(())
+        Ok(cookie_lock)
     }
 
-    fn save_cookie(&mut self, response: &reqwest::Response) -> Result<()> {
+    fn save_cookie(&mut self,
+                   response: &reqwest::Response,
+                   mut cookie_lock: CookieLock)
+        -> Result<()> {
+
         if let Some(reqwest::header::SetCookie(chunks)) = response.headers().get() {
-            if let Some(cookie) = parse_cookies(&chunks) {
-                ve2!("< Received cookie: {}={}", cookie.0, cookie.1);
-                self.config.set_cookie(Some(cookie))?;
+            if let Some((key, value)) = parse_cookies(&chunks) {
+                ve2!("< Received cookie: {}={}", key, value);
+                cookie_lock.set_cookie(key, value);
             }
         }
 

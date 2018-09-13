@@ -1,3 +1,5 @@
+use fs2::FileExt;
+use vlog::*;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -17,7 +19,6 @@ const DOTFILE_NAME: &str = ".gsclogin";
 pub struct Config {
     dotfile:    Option<PathBuf>,
     username:   String,
-    cookie:     Option<(String, String)>,
     endpoint:   String,
 }
 
@@ -38,7 +39,6 @@ impl Config {
         Config {
             dotfile,
             username:   String::new(),
-            cookie:     None,
             endpoint:   API_ENDPOINT.to_owned(),
         }
     }
@@ -55,24 +55,33 @@ impl Config {
         self.username = username;
     }
 
-    pub fn get_cookie(&mut self) -> Result<(&str, &str)> {
-        self.load_dotfile()?;
-        match &self.cookie {
-            Some((key, value)) => Ok((&key, &value)),
-            None               => Err(ErrorKind::LoginPlease)?,
-        }
+    fn new_cookie_lock(&mut self, dotfile: Dotfile, key: String, value: String)
+        -> Result<CookieLock> {
+
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(&self.get_dotfile()?)?;
+        file.lock_exclusive()?;
+
+        Ok(CookieLock {
+            file,
+            dirty: false,
+            key,
+            value,
+            dotfile,
+        })
     }
 
-    pub fn set_cookie(&mut self, cookie: Option<(String, String)>) -> Result<()> {
-        self.cookie = cookie;
-        self.save_dotfile()
+    pub fn new_cookie(&mut self) -> Result<CookieLock> {
+        self.new_cookie_lock(self.read_dotfile()?, String::new(), String::new())
     }
 
-    pub fn get_cookie_header(&mut self) -> Result<reqwest::header::Cookie> {
-        let (key, value) = self.get_cookie()?;
-        let mut header = reqwest::header::Cookie::new();
-        header.set(key.to_owned(), value.to_owned());
-        Ok(header)
+    pub fn lock_cookie(&mut self) -> Result<CookieLock> {
+        let dotfile = self.read_dotfile()?;
+        let (key, value) = super::parse_cookie(&dotfile.cookie)
+            .ok_or(ErrorKind::LoginPlease)?;
+        self.new_cookie_lock(dotfile, key, value)
     }
 
     pub fn get_dotfile(&self) -> Result<&Path> {
@@ -82,40 +91,93 @@ impl Config {
         }
     }
 
-    pub fn load_dotfile(&mut self) -> Result<()> {
+    fn default_dotfile(&self) -> Dotfile {
+        Dotfile {
+            username: self.username.clone(),
+            cookie:   String::new(),
+            endpoint: self.endpoint.clone(),
+        }
+    }
+
+    pub fn read_dotfile(&self) -> Result<Dotfile> {
         let dotfile_name = self.get_dotfile()?;
         let contents     = match fs::read_to_string(dotfile_name) {
             Ok(contents) => contents,
             Err(error) => match error.kind() {
-                std::io::ErrorKind::NotFound => return Ok(()),
-                _ => Err(error)?,
+                std::io::ErrorKind::NotFound => return Ok(self.default_dotfile()),
+                _                            => Err(error)?,
             }
         };
-
-        let parsed: Dotfile = serde_yaml::from_str(&contents)
+        
+        let parsed = serde_yaml::from_str(&contents)
             .map_err(|e| {
                 let message = format!("Could not parse dotfile: {}", dotfile_name.display());
                 Error::with_chain(e, message)
             })?;
 
-        let Dotfile { username, cookie, endpoint } = parsed;
+        Ok(parsed)
+    }
+
+    pub fn load_dotfile(&mut self) -> Result<()> {
+        let Dotfile { username, endpoint, .. } = self.read_dotfile()?;
         if !username.is_empty() { self.username = username; }
-        if !cookie.is_empty() { self.cookie = super::parse_cookie(&cookie); }
         if !endpoint.is_empty() { self.endpoint = endpoint; }
 
         Ok(())
     }
+}
 
-    fn save_dotfile(&self) -> Result<()> {
-        let dotfile_name = self.get_dotfile()?;
-        let username = self.get_username().to_owned();
-        let cookie = match &self.cookie {
-            Some((key, value)) => format!("{}={}", key, value),
-            None               => String::new(),
-        };
-        let endpoint = self.endpoint.clone();
-        let contents = serde_yaml::to_string(&Dotfile { username, cookie, endpoint })?;
-        fs::write(dotfile_name, contents)?;
+#[derive(Debug)]
+pub struct CookieLock {
+    file:       std::fs::File,
+    dirty:      bool,
+    key:        String,
+    value:      String,
+    dotfile:    Dotfile,
+}
+
+impl Drop for CookieLock {
+    fn drop(&mut self) {
+        if self.dirty {
+            if let Err(e) = self.flush_cookie() {
+                ve1!("Could not save cookie: {}", e);
+            }
+        }
+    }
+}
+
+impl CookieLock {
+    pub fn get_cookie(&self) -> (&str, &str) {
+        return (&self.key, &self.value);
+    }
+
+    pub fn get_cookie_header(&self) -> reqwest::header::Cookie {
+        let (key, value) = self.get_cookie();
+        let mut header = reqwest::header::Cookie::new();
+        header.set(key.to_owned(), value.to_owned());
+        header
+    }
+
+    pub fn set_cookie(&mut self, key: String, value: String) {
+        self.key   = key;
+        self.value = value;
+        self.dirty = true;
+    }
+
+    fn flush_cookie(&mut self) -> Result<()> {
+        if self.dirty {
+            self.dotfile.cookie = if self.key.is_empty() {
+                String::new()
+            } else {
+                format!("{}={}", self.key, self.value)
+            };
+
+            self.file.set_len(0)?;
+            let r1 = serde_yaml::to_writer(&mut self.file, &self.dotfile);
+            let r2 = self.file.unlock();
+            r1?; r2?
+        }
+        
         Ok(())
     }
 }

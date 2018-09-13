@@ -11,6 +11,7 @@ admin = []
 chrono = { version = "0.4", features = ["serde"] }
 clap = "2.0.32"
 error-chain = "0.12.0"
+fs2 = "0.4.3"
 globset = "0.4.2"
 lazy_static = "1.1"
 regex = "1.0"
