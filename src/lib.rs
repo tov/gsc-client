@@ -1,6 +1,6 @@
 use vlog::*;
-use reqwest;
-use rpassword;
+use std::collections::{hash_map, HashMap};
+use std::mem::replace;
 
 pub mod config;
 pub mod errors;
@@ -10,8 +10,9 @@ pub mod table;
 use self::errors::{Error, ErrorKind, JsonError, Result};
 
 pub struct GscClient {
-    http:   reqwest::Client,
-    config: config::Config,
+    http:               reqwest::Client,
+    config:             config::Config,
+    submission_uris:    HashMap<String, Vec<Option<String>>>
 }
 
 pub (crate) fn parse_cookie(cookie: &str) -> Option<(String, String)> {
@@ -44,8 +45,11 @@ fn glob(pattern: &str) -> Result<globset::GlobMatcher> {
 
 impl GscClient {
     pub fn new(config: config::Config) -> Result<Self> {
-        let http = reqwest::Client::new();
-        Ok(GscClient { http, config })
+        Ok(GscClient {
+            http:               reqwest::Client::new(),
+            config,
+            submission_uris:    HashMap::new(),
+        })
     }
 
     pub fn auth(&mut self, username: &str) -> Result<()> {
@@ -76,10 +80,9 @@ impl GscClient {
         self.config.save     = true;
     }
 
-    fn fetch_submissions(&mut self, user_option: Option<&str>)
+    fn fetch_submissions(&mut self, user: &str)
         -> Result<Vec<messages::SubmissionShort>> {
 
-        let user         = self.select_user(user_option);
         let uri          = format!("{}/api/users/{}/submissions", self.config.endpoint, user);
         let request      = self.http.get(&uri);
         let mut response = self.send_request(request)?;
@@ -87,18 +90,37 @@ impl GscClient {
             .map_err(|e| Error::with_chain(e, "Could not understand response from server"))
     }
 
-    fn get_uri_for_submission(&mut self, user: Option<&str>, number: usize)
-        -> Result<String> {
-
+    fn get_submission_uris(&mut self, user: &str) -> Result<Vec<Option<String>>> {
         let submissions = self.fetch_submissions(user)?;
+        let mut result  = Vec::new();
 
         for submission in &submissions {
-            if submission.assignment_number == number {
-                return Ok(format!("{}{}", self.config.endpoint, submission.uri));
+            let number = submission.assignment_number;
+
+            while number >= result.len() {
+                result.push(None);
             }
+
+            result[number] = Some(format!("{}{}", self.config.endpoint, submission.uri));
         }
 
-        Err(errors::ErrorKind::UnknownHomework(number))?
+        Ok(result)
+    }
+
+    fn get_uri_for_submission(&mut self, user_option: Option<&str>, number: usize)
+        -> Result<String> {
+
+        let user        = self.select_user(user_option).to_owned();
+        let mut cache   = replace(&mut self.submission_uris, HashMap::new());
+        let uris        = match cache.entry(user.clone()) {
+            hash_map::Entry::Occupied(entry) => entry.into_mut(),
+            hash_map::Entry::Vacant(entry) => entry.insert(self.get_submission_uris(&user)?),
+        };
+
+        match uris.get(number) {
+            Some(Some(uri)) => Ok(uri.to_owned()),
+            _               => Err(Error::from(ErrorKind::UnknownHomework(number))),
+        }
     }
 
     fn get_uri_for_submission_files(&mut self, user: Option<&str>, number: usize)
