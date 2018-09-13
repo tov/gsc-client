@@ -230,15 +230,17 @@ impl GscClient {
         -> Result<String> {
 
         let user        = self.select_user(user_option).to_owned();
+
         let mut cache   = replace(&mut self.submission_uris, HashMap::new());
         let uris        = match cache.entry(user.clone()) {
             hash_map::Entry::Occupied(entry) => entry.into_mut(),
-            hash_map::Entry::Vacant(entry) => entry.insert(self.get_submission_uris(&user)?),
-        };
+            hash_map::Entry::Vacant(entry)   => entry.insert(self.get_submission_uris(&user)?),
+        }.clone();
+        replace(&mut self.submission_uris, cache);
 
         match uris.get(number) {
             Some(Some(uri)) => Ok(uri.to_owned()),
-            _               => Err(Error::from(ErrorKind::UnknownHomework(number))),
+            _               => Err(ErrorKind::UnknownHomework(number).into()),
         }
     }
 
@@ -271,7 +273,7 @@ impl GscClient {
         let mut table = table::TextTable::new("%r  %l  [%l] %l\n");
 
         if files.is_empty() {
-            return Err(Error::from(ErrorKind::NoSuchRemoteFile(rpat.clone())));
+            return Err(ErrorKind::NoSuchRemoteFile(rpat.clone()).into());
         }
 
         for file in &files {
@@ -394,10 +396,12 @@ impl GscClient {
             for file in files {
                 let uri          = format!("{}{}", self.config.get_endpoint(), file.uri);
                 let request      = self.http.delete(&uri);
+                v2!("Deleting remote file ‘hw{}:{}’...", rpat.hw, file.name);
                 self.send_request(request)?;
             }
         }
 
+        v2!("Done.");
         Ok(())
     }
 
@@ -405,7 +409,7 @@ impl GscClient {
         let username = self.config.get_username();
 
         if username.is_empty() {
-            return Err(Error::from(ErrorKind::LoginPlease))
+            return Err(ErrorKind::LoginPlease.into())
         }
 
         v1!("{}", username);
