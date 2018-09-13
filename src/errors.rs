@@ -41,7 +41,7 @@ error_chain! {
 
         SyntaxError(class: String, thing: String) {
             description("syntax error")
-            display("Syntax error: Could not parse {}: ‘{}’.", class, thing)
+            display("Syntax error: Could not parse ‘{}’ as {}.", thing, class)
         }
 
         PasswordMismatch {
