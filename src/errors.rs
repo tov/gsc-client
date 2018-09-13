@@ -57,5 +57,10 @@ error_chain! {
             description("no dotfile given")
             display("Please specify a configuration file.")
         }
+
+        NoSuchRemoteFile(hw: usize, pat: String) {
+            description("no such remote file")
+            display("No remote files matching pattern ‘hw{}:{}’.", hw, pat)
+        }
     }
 }

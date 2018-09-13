@@ -15,6 +15,11 @@ pub struct GscClient {
     submission_uris:    HashMap<String, Vec<Option<String>>>
 }
 
+pub struct RemotePattern {
+    pub hw:     usize,
+    pub pat:    String,
+}
+
 pub (crate) fn parse_cookie(cookie: &str) -> Option<(String, String)> {
     let pair = match cookie.find(';') {
         Some(index) => &cookie[.. index],
@@ -156,6 +161,10 @@ impl GscClient {
         let files     = self.fetch_file_list(user, number, pattern)?;
         let mut table = table::TextTable::new("%r  %l  [%l] %l\n");
 
+        if files.is_empty() {
+            return Err(Error::from(ErrorKind::NoSuchRemoteFile(number, pattern.to_owned())));
+        }
+
         for file in &files {
             table.add_row(
                 table::Row::new()
@@ -210,6 +219,26 @@ impl GscClient {
 
         v1!("hw{} ({})", number, owners);
         v1!("{}", table);
+
+        Ok(())
+    }
+
+    pub fn cat(&mut self, user: Option<&str>, pats: &[RemotePattern]) -> Result<()> {
+        for RemotePattern { hw, pat } in pats {
+            let files = self.fetch_file_list(user, *hw, pat)?;
+
+            if files.is_empty() {
+                let error = Error::from(ErrorKind::NoSuchRemoteFile(*hw, pat.to_owned()));
+                ve1!("{}", error);
+            }
+
+            for file in files {
+                let uri          = format!("{}{}", self.config.endpoint, file.uri);
+                let request      = self.http.get(&uri);
+                let mut response = self.send_request(request)?;
+                response.copy_to(&mut std::io::stdout())?;
+            }
+        }
 
         Ok(())
     }
