@@ -97,6 +97,12 @@ pub struct Submission {
     pub status:             SubmissionStatus,
 }
 
+impl Submission {
+    pub fn quota_remaining(&self) -> f32 {
+        100.0 * (self.bytes_quota - self.bytes_used) as f32 / self.bytes_quota as f32
+    }
+}
+
 #[derive(Deserialize, Debug)]
 pub struct Owner {
     pub name:               String,
