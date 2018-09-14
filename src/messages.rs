@@ -51,6 +51,12 @@ pub struct User {
 }
 
 #[derive(Deserialize, Debug)]
+pub struct UserShort {
+    pub name:               String,
+    pub uri:                String,
+}
+
+#[derive(Deserialize, Debug)]
 pub struct SubmissionShort {
     pub assignment_number:  usize,
     pub id:                 usize,
@@ -131,8 +137,9 @@ pub struct Submission {
     pub uri:                String,
     pub grade:              f64,
     pub files_uri:          String,
-    pub owner1:             Owner,
-    pub owner2:             Option<Owner>,
+    pub owner1:             UserShort,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner2:             Option<UserShort>,
     pub bytes_used:         usize,
     pub bytes_quota:        usize,
     pub open_date:          DateTime,
@@ -147,12 +154,6 @@ impl Submission {
     pub fn quota_remaining(&self) -> f32 {
         100.0 * (self.bytes_quota - self.bytes_used) as f32 / self.bytes_quota as f32
     }
-}
-
-#[derive(Deserialize, Debug)]
-pub struct Owner {
-    pub name:               String,
-    pub uri:                String,
 }
 
 #[derive(Deserialize, Debug)]
