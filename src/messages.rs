@@ -16,7 +16,7 @@ pub struct ExamGrade {
     pub possible:           usize,
 }
 
-#[derive(Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum PartnerRequestStatus {
     Outgoing,
@@ -59,7 +59,7 @@ pub struct SubmissionShort {
     pub grade:              f64,
 }
 
-#[derive(Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum SubmissionStatus {
     Future,

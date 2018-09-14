@@ -371,7 +371,70 @@ impl GscClient {
         Ok(())
     }
 
-    pub fn status_user(&self, _user: Option<&str>) -> Result<()> {
+    pub fn status_user(&self, user_option: Option<&str>) -> Result<()> {
+        let user         = self.select_user(user_option);
+        let uri          = format!("{}/api/users/{}", self.config.get_endpoint(), user);
+        let request      = self.http.get(&uri);
+        let mut response = self.send_request(request)?;
+
+        let user: messages::User = response.json()?;
+
+        v1!("Status for {}:\n", user.name);
+
+        if user.submissions.iter().any(|s| s.status != messages::SubmissionStatus::Future) {
+            let mut table = table::TextTable::new("    hw%l: %r    %l\n");
+
+            for s in &user.submissions {
+                let grade = match s.status {
+                    messages::SubmissionStatus::Future => continue,
+                    messages::SubmissionStatus::Closed => format!("{:.1}%", s.grade),
+                    _ => String::new(),
+                };
+
+                table.add_row(table::Row::new()
+                    .add_cell(s.assignment_number)
+                    .add_cell(grade)
+                    .add_cell(s.status));
+            }
+
+            v1!("  Submissions:\n{}", table);
+        }
+
+        if !user.exam_grades.is_empty() {
+            let mut table = table::TextTable::new("    Exam %l: %r%%    (%l / %l)\n");
+
+            for e in &user.exam_grades {
+                let grade = format!("{:.1}", 100.0 * e.points as f64 / e.possible as f64);
+                table.add_row(table::Row::new()
+                    .add_cell(e.number)
+                    .add_cell(grade)
+                    .add_cell(e.points)
+                    .add_cell(e.possible));
+            }
+
+            v1!("  Exam grades:\n{}", table);
+        }
+
+        if !user.partner_requests.is_empty() {
+            let mut table = table::TextTable::new("    %l %l\n");
+
+            for p in &user.partner_requests {
+                use self::messages::PartnerRequestStatus::*;
+                let hw      = format!("hw{}:", p.assignment_number);
+                let message = match p.status {
+                    Outgoing => format!("sent to {}", p.user),
+                    Incoming => format!("received from {}", p.user),
+                    _        => continue,
+                };
+                table.add_row(table::Row::new()
+                    .add_cell(hw)
+                    .add_cell(message));
+            }
+
+            v1!("  Partner requests:\n{}", table);
+
+            v1!("Partner requests can be managed with the ‘gsc partner’ command.");
+        }
 
         Ok(())
     }

@@ -24,7 +24,7 @@ enum Command {
     Ls{user: Option<String>, rpat: RemotePattern},
     Passwd{user: Option<String>},
     Rm{user: Option<String>, rpats: Vec<RemotePattern>},
-    Status{user: Option<String>, hw: usize},
+    Status{user: Option<String>, hw: Option<usize>},
     Whoami,
 }
 
@@ -35,16 +35,17 @@ fn do_it() -> Result<bool> {
     let mut client = GscClient::new(config)?;
 
     match command {
-        Command::Auth{user}             => client.auth(&user),
-        Command::Cat{user, rpats}       => client.cat(bs(&user), &rpats),
-        Command::Create{user}           => client.create(&user),
-        Command::Cp{user, srcs, dst}    => client.cp(bs(&user), &srcs, &dst),
-        Command::Deauth                 => client.deauth(),
-        Command::Ls{user, rpat}         => client.ls(bs(&user), &rpat),
-        Command::Passwd{user}           => client.passwd(bs(&user)),
-        Command::Rm{user, rpats}        => client.rm(bs(&user), &rpats),
-        Command::Status{user, hw}       => client.status_hw(bs(&user), hw),
-        Command::Whoami                 => client.whoami(),
+        Command::Auth{user}                 => client.auth(&user),
+        Command::Cat{user, rpats}           => client.cat(bs(&user), &rpats),
+        Command::Create{user}               => client.create(&user),
+        Command::Cp{user, srcs, dst}        => client.cp(bs(&user), &srcs, &dst),
+        Command::Deauth                     => client.deauth(),
+        Command::Ls{user, rpat}             => client.ls(bs(&user), &rpat),
+        Command::Passwd{user}               => client.passwd(bs(&user)),
+        Command::Rm{user, rpats}            => client.rm(bs(&user), &rpats),
+        Command::Status{user, hw: Some(i)}  => client.status_hw(bs(&user), i),
+        Command::Status{user, hw: None}     => client.status_user(bs(&user)),
+        Command::Whoami                     => client.whoami(),
     }?;
 
     Ok(client.had_warning())
@@ -141,12 +142,12 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                     .required(true)
                     .multiple(true)))
             .subcommand(SubCommand::with_name("status")
-                .about("Retrieves submission status")
+                .about("Retrieves user or submission status")
                 .add_common()
-                .add_user_opt("The user whose homework to lookup")
+                .add_user_opt("The user whose status check")
                 .arg(Arg::with_name("HW")
-                    .help("The homework, e.g. ‘hw3’")
-                    .required(true)))
+                    .help("The homework to lookup, e.g. ‘hw3’")
+                    .required(false)))
             .subcommand(SubCommand::with_name("whoami")
                 .about("Prints your username, if authenticated")
                 .add_common()))
@@ -228,9 +229,11 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
 
         else if let Some(submatches) = matches.subcommand_matches("status") {
             process_common(submatches, config);
-            let user    = submatches.value_of("USER").map(str::to_owned);
-            let hw_spec = submatches.value_of("HW").unwrap();
-            let hw      = parse_hw(hw_spec)?;
+            let user = submatches.value_of("USER").map(str::to_owned);
+            let hw   = match submatches.value_of("HW") {
+                Some(hw_spec) => Some(parse_hw(hw_spec)?),
+                None          => None,
+            };
             Ok(Command::Status{user, hw})
         }
 
