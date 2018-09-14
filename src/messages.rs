@@ -1,6 +1,6 @@
 use serde_derive::{Serialize, Deserialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct DateTime(chrono::DateTime<chrono::offset::FixedOffset>);
 
 impl std::fmt::Display for DateTime {
@@ -218,6 +218,26 @@ impl Default for UserChange {
             partner_requests: None,
             password:         None,
             role:             None,
+        }
+    }
+}
+
+#[derive(Serialize, Debug)]
+pub struct SubmissionChange {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub due_date:           Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eval_date:          Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bytes_quota:        Option<usize>,
+}
+
+impl Default for SubmissionChange {
+    fn default() -> Self {
+        SubmissionChange {
+            due_date:       None,
+            eval_date:      None,
+            bytes_quota:    None,
         }
     }
 }

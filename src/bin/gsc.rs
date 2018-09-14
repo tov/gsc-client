@@ -16,6 +16,7 @@ fn main() {
 }
 
 enum Command {
+    AdminExtend{user: String, hw: usize, date: String, eval: bool},
     Auth{user: String},
     Cat{user: Option<String>, rpats: Vec<RemotePattern>},
     Create{user: String},
@@ -41,6 +42,8 @@ fn do_it() -> Result<bool> {
     use self::Command::*;
 
     match command {
+        AdminExtend{user, hw, date, eval}
+                                     => client.admin_extend(&user, hw, &date, eval),
         Auth{user}                   => client.auth(&user),
         Cat{user, rpats}             => client.cat(bs(&user), &rpats),
         Create{user}                 => client.create(&user),
@@ -85,6 +88,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             .about("Command-line interface to the GSC server")
             .version(crate_version!())
             .add_common()
+            .add_admin()
             .subcommand(SubCommand::with_name("auth")
                 .about("Authenticates with the server")
                 .add_common()
@@ -180,7 +184,22 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
         let matches = self.0.get_matches_safe()?;
         process_common(&matches, config);
 
-        if let Some(submatches) = matches.subcommand_matches("auth") {
+        if let Some(submatches) = matches.subcommand_matches("admin") {
+            process_common(submatches, config);
+
+            if let Some(subsubmatches) = submatches.subcommand_matches("extend") {
+                process_common(submatches, config);
+                let eval = subsubmatches.is_present("EVAL");
+                let hw   = parse_hw(subsubmatches.value_of("HW").unwrap())?;
+                let user = subsubmatches.value_of("USER").unwrap().to_owned();
+                let date = subsubmatches.value_of("DATESPEC").unwrap().to_owned();
+                Ok(Command::AdminExtend{hw, user, date, eval})
+            } else {
+                Err(ErrorKind::NoCommandGiven.into())
+            }
+        }
+
+        else if let Some(submatches) = matches.subcommand_matches("auth") {
             process_common(submatches, config);
             let user = submatches.value_of("USER").unwrap().to_owned();
             Ok(Command::Auth{user})
@@ -299,12 +318,46 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
 }
 
 trait AppExt {
+    fn add_admin(self) -> Self;
     fn add_common(self) -> Self;
     fn add_partner_args(self) -> Self;
     fn add_user_opt(self, about: &'static str) -> Self;
 }
 
 impl<'a, 'b> AppExt for clap::App<'a, 'b> {
+    #[cfg(feature = "admin")]
+    fn add_admin(self) -> Self {
+        use clap::*;
+
+        self.subcommand(SubCommand::with_name("admin")
+            .about("Administrative commands")
+            .add_common()
+            .subcommand(SubCommand::with_name("extend")
+                .about("Extends a due date")
+                .arg(Arg::with_name("EVAL")
+                    .short("e")
+                    .long("eval")
+                    .takes_value(false)
+                    .help("Extends self eval instead of file  submission"))
+                .arg(Arg::with_name("HW")
+                    .takes_value(true)
+                    .required(true)
+                    .help("The homework to extend"))
+                .arg(Arg::with_name("USER")
+                    .takes_value(true)
+                    .required(true)
+                    .help("The user to extend"))
+                .arg(Arg::with_name("DATESPEC")
+                    .takes_value(true)
+                    .required(true)
+                    .help("The new due date"))))
+    }
+
+    #[cfg(not(feature = "admin"))]
+    fn add_admin(self) -> Self {
+        self
+    }
+
     fn add_common(self) -> Self {
         use clap::*;
 
