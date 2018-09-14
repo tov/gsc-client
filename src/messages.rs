@@ -9,10 +9,54 @@ impl std::fmt::Display for DateTime {
     }
 }
 
+#[derive(Deserialize, Debug)]
+pub struct ExamGrade {
+    pub number:             usize,
+    pub points:             usize,
+    pub possible:           usize,
+}
+
 #[derive(Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum PartnerRequestStatus {
+    Outgoing,
+    Incoming,
+    Accepted,
+    Canceled,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct PartnerRequest {
+    pub assignment_number:  usize,
+    pub user:               String,
+    pub status:             PartnerRequestStatus,
+}
+
+#[derive(Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum UserRole {
+    Student,
+    Grader,
+    Admin,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct User {
+    pub name:               String,
+    pub role:               UserRole,
+    pub uri:                String,
+    pub exam_grades:        Vec<ExamGrade>,
+    pub partner_requests:   Vec<PartnerRequest>,
+    pub submissions:        Vec<SubmissionShort>,
+}
+
+#[derive(Deserialize, Debug)]
 pub struct SubmissionShort {
-    pub assignment_number: usize,
-    pub uri:               String,
+    pub assignment_number:  usize,
+    pub id:                 usize,
+    pub uri:                String,
+    pub status:             SubmissionStatus,
+    pub grade:              f64,
 }
 
 #[derive(Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -83,7 +127,9 @@ impl std::fmt::Display for SubmissionEvalStatus {
 #[derive(Deserialize, Debug)]
 pub struct Submission {
     pub assignment_number:  usize,
+    pub id:                 usize,
     pub uri:                String,
+    pub grade:              f64,
     pub files_uri:          String,
     pub owner1:             Owner,
     pub owner2:             Option<Owner>,
