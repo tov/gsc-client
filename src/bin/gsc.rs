@@ -1,5 +1,5 @@
 use gsc_client::*;
-use gsc_client::errors::{Result, syntax_error, no_command_given};
+use gsc_client::errors::{Result, ErrorKind, syntax_error};
 use std::process::exit;
 
 fn main() {
@@ -22,6 +22,9 @@ enum Command {
     Cp{user: Option<String>, srcs: Vec<CpArg>, dst: CpArg},
     Deauth,
     Ls{user: Option<String>, rpat: RemotePattern},
+    PartnerRequest{me: Option<String>, hw: usize, them: String},
+    PartnerAccept{me: Option<String>, hw: usize, them: String},
+    PartnerCancel{me: Option<String>, hw: usize, them: String},
     Passwd{user: Option<String>},
     Rm{user: Option<String>, rpats: Vec<RemotePattern>},
     Status{user: Option<String>, hw: Option<usize>},
@@ -34,18 +37,23 @@ fn do_it() -> Result<bool> {
     let command    = GscClientApp::new().process(&mut config)?;
     let mut client = GscClient::new(config)?;
 
+    use self::Command::*;
+
     match command {
-        Command::Auth{user}                 => client.auth(&user),
-        Command::Cat{user, rpats}           => client.cat(bs(&user), &rpats),
-        Command::Create{user}               => client.create(&user),
-        Command::Cp{user, srcs, dst}        => client.cp(bs(&user), &srcs, &dst),
-        Command::Deauth                     => client.deauth(),
-        Command::Ls{user, rpat}             => client.ls(bs(&user), &rpat),
-        Command::Passwd{user}               => client.passwd(bs(&user)),
-        Command::Rm{user, rpats}            => client.rm(bs(&user), &rpats),
-        Command::Status{user, hw: Some(i)}  => client.status_hw(bs(&user), i),
-        Command::Status{user, hw: None}     => client.status_user(bs(&user)),
-        Command::Whoami                     => client.whoami(),
+        Auth{user}                   => client.auth(&user),
+        Cat{user, rpats}             => client.cat(bs(&user), &rpats),
+        Create{user}                 => client.create(&user),
+        Cp{user, srcs, dst}          => client.cp(bs(&user), &srcs, &dst),
+        Deauth                       => client.deauth(),
+        Ls{user, rpat}               => client.ls(bs(&user), &rpat),
+        PartnerRequest{me, hw, them} => client.partner_request(bs(&me), hw, &them),
+        PartnerAccept{me, hw, them}  => client.partner_accept(bs(&me), hw, &them),
+        PartnerCancel{me, hw, them}  => client.partner_cancel(bs(&me), hw, &them),
+        Passwd{user}                 => client.passwd(bs(&user)),
+        Rm{user, rpats}              => client.rm(bs(&user), &rpats),
+        Status{user, hw: Some(i)}    => client.status_hw(bs(&user), i),
+        Status{user, hw: None}       => client.status_user(bs(&user)),
+        Whoami                       => client.whoami(),
     }?;
 
     Ok(client.had_warning())
@@ -123,6 +131,19 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 .arg(Arg::with_name("SPEC")
                     .help("The homework or file(s) to list, e.g. ‘hw3’")
                     .required(true)))
+            .subcommand(SubCommand::with_name("partner")
+                .about("Manages partners")
+                .add_common()
+                .add_user_opt("The user whose partners to manage")
+                .subcommand(SubCommand::with_name("request")
+                    .about("Sends a partner request")
+                    .add_partner_args())
+                .subcommand(SubCommand::with_name("accept")
+                    .about("Accepts a partner request")
+                    .add_partner_args())
+                .subcommand(SubCommand::with_name("cancel")
+                    .about("Cancels a partner request")
+                    .add_partner_args()))
             .subcommand(SubCommand::with_name("passwd")
                 .about("Changes the password")
                 .add_common()
@@ -165,7 +186,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
 
         else if let Some(submatches) = matches.subcommand_matches("cat") {
             process_common(submatches, config);
-            let user      = submatches.value_of("USER").map(str::to_owned);
+            let user      = submatches.value_of("ME").map(str::to_owned);
             let mut rpats = Vec::new();
 
             for arg in submatches.values_of("FILE").unwrap() {
@@ -183,7 +204,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
 
         else if let Some(submatches) = matches.subcommand_matches("cp") {
             process_common(submatches, config);
-            let user     = submatches.value_of("USER").map(str::to_owned);
+            let user     = submatches.value_of("ME").map(str::to_owned);
             let all      = submatches.is_present("ALL");
             let mut srcs = Vec::new();
             let dst      = parse_cp_arg(submatches.value_of("DST").unwrap(), true)?;
@@ -202,21 +223,48 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
 
         else if let Some(submatches) = matches.subcommand_matches("ls") {
             process_common(submatches, config);
-            let user      = submatches.value_of("USER").map(str::to_owned);
+            let user      = submatches.value_of("ME").map(str::to_owned);
             let ls_spec   = submatches.value_of("SPEC").unwrap();
             let (hw, pat) = parse_hw_opt_file(ls_spec)?;
             Ok(Command::Ls{user, rpat: RemotePattern{hw, pat}})
         }
 
+        else if let Some(submatches) = matches.subcommand_matches("partner") {
+            process_common(submatches, config);
+            let me = submatches.value_of("ME").map(str::to_owned);
+
+            fn process_partner(matches: &clap::ArgMatches, config: &mut config::Config)
+                -> Result< (usize, String)> {
+
+                process_common(matches, config);
+                let hw   = matches.value_of("HW").unwrap();
+                let them = matches.value_of("USER").unwrap();
+                Ok((parse_hw(hw)?, them.to_owned()))
+            }
+
+            if let Some(subsubmatches) = submatches.subcommand_matches("request") {
+                let (hw, them) = process_partner(subsubmatches, config)?;
+                Ok(Command::PartnerRequest{me, hw, them})
+            } else if let Some(subsubmatches) = submatches.subcommand_matches("accept") {
+                let (hw, them) = process_partner(subsubmatches, config)?;
+                Ok(Command::PartnerAccept{me, hw, them})
+            } else if let Some(subsubmatches) = submatches.subcommand_matches("cancel") {
+                let (hw, them) = process_partner(subsubmatches, config)?;
+                Ok(Command::PartnerCancel{me, hw, them})
+            } else {
+                Err(ErrorKind::NoPartnerSubcommandGiven.into())
+            }
+        }
+
         else if let Some(submatches) = matches.subcommand_matches("passwd") {
             process_common(submatches, config);
-            let user = submatches.value_of("USER").map(str::to_owned);
+            let user = submatches.value_of("ME").map(str::to_owned);
             Ok(Command::Passwd{user})
         }
 
         else if let Some(submatches) = matches.subcommand_matches("rm") {
             process_common(submatches, config);
-            let user      = submatches.value_of("USER").map(str::to_owned);
+            let user      = submatches.value_of("ME").map(str::to_owned);
             let all       = submatches.is_present("ALL");
             let mut rpats = Vec::new();
 
@@ -229,7 +277,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
 
         else if let Some(submatches) = matches.subcommand_matches("status") {
             process_common(submatches, config);
-            let user = submatches.value_of("USER").map(str::to_owned);
+            let user = submatches.value_of("ME").map(str::to_owned);
             let hw   = match submatches.value_of("HW") {
                 Some(hw_spec) => Some(parse_hw(hw_spec)?),
                 None          => None,
@@ -243,13 +291,14 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
         }
 
         else {
-            Err(no_command_given())
+            Err(ErrorKind::NoCommandGiven.into())
         }
     }
 }
 
 trait AppExt {
     fn add_common(self) -> Self;
+    fn add_partner_args(self) -> Self;
     fn add_user_opt(self, about: &'static str) -> Self;
 }
 
@@ -272,10 +321,22 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
                 .help("Makes the output quieter"))
     }
 
+    fn add_partner_args(self) -> Self {
+        use clap::*;
+        self.arg(Arg::with_name("HW")
+                .help("The homework of the partner request")
+                .takes_value(true)
+                .required(true))
+            .arg(Arg::with_name("USER")
+                .help("The other user of the partner request")
+                .takes_value(true)
+                .required(true))
+    }
+
     #[cfg(feature = "admin")]
     fn add_user_opt(self, about: &'static str) -> Self {
         use clap::*;
-        self.arg(Arg::with_name("USER")
+        self.arg(Arg::with_name("ME")
             .short("u")
             .long("user")
             .help(about)

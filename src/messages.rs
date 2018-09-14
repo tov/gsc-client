@@ -25,14 +25,14 @@ pub enum PartnerRequestStatus {
     Canceled,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct PartnerRequest {
     pub assignment_number:  usize,
     pub user:               String,
     pub status:             PartnerRequestStatus,
 }
 
-#[derive(Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum UserRole {
     Student,
@@ -199,6 +199,22 @@ impl FilePurpose {
 }
 
 #[derive(Serialize, Debug)]
-pub struct PasswordChange {
-    pub password:           String,
+pub struct UserChange {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partner_requests: Option<Vec<PartnerRequest>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub password:         Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role:             Option<UserRole>,
 }
+
+impl Default for UserChange {
+    fn default() -> Self {
+        UserChange {
+            partner_requests: None,
+            password:         None,
+            role:             None,
+        }
+    }
+}
+

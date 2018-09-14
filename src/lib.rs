@@ -76,7 +76,7 @@ impl GscClient {
     }
 
     pub fn auth(&mut self, username: &str) -> Result<()> {
-        let uri = format!("{}/api/users/{}", self.config.get_endpoint(), username);
+        let uri = self.user_uri(username);
 
         self.config.set_username(username.to_owned());
 
@@ -284,7 +284,7 @@ impl GscClient {
     fn fetch_submissions(&self, user: &str)
         -> Result<Vec<messages::SubmissionShort>> {
 
-        let uri          = format!("{}/api/users/{}/submissions", self.config.get_endpoint(), user);
+        let uri          = self.user_uri(user) + "/submissions";
         let request      = self.http.get(&uri);
         let mut response = self.send_request(request)?;
         response.json()
@@ -373,7 +373,7 @@ impl GscClient {
 
     pub fn status_user(&self, user_option: Option<&str>) -> Result<()> {
         let user         = self.select_user(user_option);
-        let uri          = format!("{}/api/users/{}", self.config.get_endpoint(), user);
+        let uri          = self.user_uri(&user);
         let request      = self.http.get(&uri);
         let mut response = self.send_request(request)?;
 
@@ -524,11 +524,56 @@ impl GscClient {
         Ok(())
     }
 
+    pub fn partner_request(&self, me_opt: Option<&str>, hw: usize, them: &str) -> Result<()> {
+        self.partner_operation(messages::PartnerRequestStatus::Outgoing, me_opt, hw, them)
+    }
+
+    pub fn partner_accept(&self, me_opt: Option<&str>, hw: usize, them: &str)-> Result<()> {
+        self.partner_operation(messages::PartnerRequestStatus::Accepted, me_opt, hw, them)
+    }
+
+    pub fn partner_cancel(&self, me_opt: Option<&str>, hw: usize, them: &str)-> Result<()> {
+        self.partner_operation(messages::PartnerRequestStatus::Canceled, me_opt, hw, them)
+    }
+
+    pub fn partner_operation(&self,
+                             op: messages::PartnerRequestStatus,
+                             me_opt: Option<&str>,
+                             hw: usize,
+                             them: &str)
+        -> Result<()> {
+
+        let me          = self.select_user(me_opt);
+        let uri         = self.user_uri(&me);
+        let mut message = messages::UserChange::default();
+        message.partner_requests = Some(vec![
+            messages::PartnerRequest {
+                assignment_number:  hw,
+                user:               them.to_owned(),
+                status:             op,
+            }
+        ]);
+
+        let s = serde_json::to_string(&message).unwrap();
+        ve0!("{}", s);
+
+        let mut request = self.http.patch(&uri);
+        request.json(&message);
+        self.send_request(request)?;
+
+        Ok(())
+    }
+
+    fn user_uri(&self, user: &str) -> String {
+        format!("{}/api/users/{}", self.config.get_endpoint(), user)
+    }
+
     pub fn passwd(&self, user_option: Option<&str>) -> Result<()> {
         let user         = self.select_user(user_option);
         let password     = get_matching_passwords(&user)?;
-        let message      = messages::PasswordChange { password };
-        let uri          = format!("{}/api/users/{}", self.config.get_endpoint(), user);
+        let mut message  = messages::UserChange::default();
+        message.password = Some(password);
+        let uri          = self.user_uri(&user);
         let mut request  = self.http.patch(&uri);
         request.json(&message);
         self.send_request(request)?;

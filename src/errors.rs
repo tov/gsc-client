@@ -54,6 +54,11 @@ error_chain! {
             display("No subcommand given; pass -h for help.")
         }
 
+        NoPartnerSubcommandGiven {
+            description("no partner subcommand given")
+            display("The ‘gsc partner’ command requires a subcommand; pass -h for help.")
+        }
+
         LoginPlease {
             description("login please")
             display("You are not logged in; use the ‘gsc auth’ command to authenticate.")
@@ -104,10 +109,6 @@ error_chain! {
 
 pub fn syntax_error<S1: Into<String>, S2: Into<String>>(class: S1, thing: S2) -> Error {
     ErrorKind::SyntaxError(class.into(), thing.into()).into()
-}
-
-pub fn no_command_given() -> Error {
-    ErrorKind::NoCommandGiven.into()
 }
 
 pub fn dest_pat_is_multiple(rpat: &RemotePattern,
