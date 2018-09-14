@@ -104,6 +104,12 @@ error_chain! {
             description("destination pattern is multiple")
             display("Destination pattern ‘{}’ resolves to multiple remote files:\n{}", rpat, rfiles)
         }
+
+        SourceDirToDestinationFile(src: usize, dst: PathBuf) {
+            description("source directory to destination file")
+            display("Cannot copy source directory ‘hw{}’ over file destination ‘{}’.",
+                    src, dst.display())
+        }
     }
 }
 

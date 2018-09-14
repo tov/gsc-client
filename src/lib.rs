@@ -144,9 +144,11 @@ impl GscClient {
         };
 
         let mut src_files = Vec::new();
+        let mut any_whole = false;
 
         for src_rpat in &src_rpats {
             let whole_hw = src_rpat.pat.is_empty();
+            any_whole |= whole_hw;
             src_files.extend(
                 self.fetch_file_list(user, src_rpat)?
                     .into_iter()
@@ -158,20 +160,37 @@ impl GscClient {
         }
 
         match dst_type {
+            // cp FILE FILE
             DstType::File if src_files.len() == 1 =>
-                self.download_file(&src_files[0].2, &src_files[0].0.uri, dst)?,
+                if src_files[0].1 {
+                    // cp -a hwN: FILE # error!
+                    Err(ErrorKind::SourceDirToDestinationFile(src_files[0].2.hw,
+                                                              dst.to_owned()))?;
+                } else {
+                    self.download_file(&src_files[0].2, &src_files[0].0.uri, dst)?;
+                }
 
+            // cp FILE FILE...+ FILE  # error!
             DstType::File =>
                 Err(ErrorKind::MultipleSourcesOneDestination(dst.display().to_string()))?,
 
-            DstType::DoesNotExist if src_files.len() == 1 && !ends_in_slash(dst) =>
+            // cp FILE FILE_DNE
+            DstType::DoesNotExist if src_files.len() == 1 && !src_files[0].1 && !ends_in_slash(dst) =>
                 self.download_file(&src_files[0].2, &src_files[0].0.uri, dst)?,
 
+            // cp FILE... DIR
+            // cp FILE... DIR_DNE
             _ => {
+                // cp -a ...
+                if any_whole {
+                    soft_create_dir(dst)?;
+                }
+
                 for (meta, whole_hw, rpat) in &src_files {
                     let mut file_dst = dst.to_owned();
                     if *whole_hw {
-                        file_dst.push(meta.purpose.to_dir())
+                        file_dst.push(meta.purpose.to_dir());
+                        soft_create_dir(&file_dst)?;
                     }
                     file_dst.push(&meta.name);
                     self.download_file(rpat, &meta.uri, &file_dst)?;
@@ -245,10 +264,6 @@ impl GscClient {
     }
 
     fn download_file(&self, src: &RemotePattern, rel_uri: &str, dst: &Path) -> Result<()> {
-        if let Some(dir) = dst.parent() {
-            std::fs::create_dir_all(dir)?;
-        }
-
         let mut file = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -704,6 +719,14 @@ fn prompt_password(prompt: &str, username: &str) -> Result<String> {
     Ok(password)
 }
 
+fn soft_create_dir(path: &Path) -> Result<()> {
+    match std::fs::create_dir(path) {
+        Ok(_)  => Ok(()),
+        Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
+        Err(e) => Err(e)?,
+    }
+}
+
 impl std::fmt::Display for RemotePattern {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "hw{}:{}", self.hw, self.pat)
@@ -718,4 +741,5 @@ impl std::fmt::Display for CpArg {
         }
     }
 }
+
 
