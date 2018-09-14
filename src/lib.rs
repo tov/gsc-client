@@ -4,8 +4,8 @@ use vlog::*;
 use percent_encoding::{utf8_percent_encode, PATH_SEGMENT_ENCODE_SET};
 use std::collections::{hash_map, HashMap};
 use std::io;
-use std::mem::replace;
 use std::path::{Path, PathBuf};
+use std::cell::{Cell, RefCell};
 
 pub mod config;
 pub mod errors;
@@ -18,8 +18,8 @@ use self::config::DotfileLock;
 pub struct GscClient {
     http:               reqwest::Client,
     config:             config::Config,
-    submission_uris:    HashMap<String, Vec<Option<String>>>,
-    had_warning:        bool,
+    submission_uris:    RefCell<HashMap<String, Vec<Option<String>>>>,
+    had_warning:        Cell<bool>,
 }
 
 #[derive(Clone, Debug)]
@@ -66,13 +66,13 @@ impl GscClient {
         Ok(GscClient {
             http:               reqwest::Client::new(),
             config,
-            submission_uris:    HashMap::new(),
-            had_warning:        false,
+            submission_uris:    RefCell::new(HashMap::new()),
+            had_warning:        Cell::new(false),
         })
     }
 
     pub fn had_warning(&self) -> bool {
-        self.had_warning
+        self.had_warning.get()
     }
 
     pub fn auth(&mut self, username: &str) -> Result<()> {
@@ -100,7 +100,7 @@ impl GscClient {
         }
     }
 
-    pub fn cp(&mut self, user: Option<&str>, srcs: &[CpArg], dst: &CpArg)
+    pub fn cp(&self, user: Option<&str>, srcs: &[CpArg], dst: &CpArg)
         -> Result<()> {
 
         match dst {
@@ -109,7 +109,7 @@ impl GscClient {
         }
     }
 
-    pub fn cp_dn(&mut self, user: Option<&str>, raw_srcs: &[CpArg], dst: &Path)
+    pub fn cp_dn(&self, user: Option<&str>, raw_srcs: &[CpArg], dst: &Path)
               -> Result<()> {
 
         let mut src_rpats = Vec::new();
@@ -183,7 +183,7 @@ impl GscClient {
         Ok(())
     }
 
-    pub fn cp_up(&mut self, user: Option<&str>, raw_srcs: &[CpArg], dst: &RemotePattern)
+    pub fn cp_up(&self, user: Option<&str>, raw_srcs: &[CpArg], dst: &RemotePattern)
                  -> Result<()> {
 
         let mut srcs = Vec::new();
@@ -203,7 +203,7 @@ impl GscClient {
                     Ok(s)  => s.to_owned(),
                     Err(e) => {
                         ve1!("{}", e);
-                        self.had_warning = true;
+                        self.had_warning.set(true);
                         continue;
                     }
                 };
@@ -231,7 +231,7 @@ impl GscClient {
         Ok(())
     }
 
-    fn upload_file(&mut self, user: Option<&str>, src: &Path, dst: &RemotePattern) -> Result<()> {
+    fn upload_file(&self, user: Option<&str>, src: &Path, dst: &RemotePattern) -> Result<()> {
         let src_file     = std::fs::File::open(&src)?;
         let encoded_dst  = utf8_percent_encode(&dst.pat, PATH_SEGMENT_ENCODE_SET);
         let base_uri     = self.get_uri_for_submission_files(user, dst.hw)?;
@@ -244,7 +244,7 @@ impl GscClient {
         Ok(())
     }
 
-    fn download_file(&mut self, src: &RemotePattern, rel_uri: &str, dst: &Path) -> Result<()> {
+    fn download_file(&self, src: &RemotePattern, rel_uri: &str, dst: &Path) -> Result<()> {
         if let Some(dir) = dst.parent() {
             std::fs::create_dir_all(dir)?;
         }
@@ -264,7 +264,7 @@ impl GscClient {
         Ok(())
     }
 
-    fn get_base_filename<'a>(&mut self, path: &'a Path) -> Result<&'a str> {
+    fn get_base_filename<'a>(&self, path: &'a Path) -> Result<&'a str> {
         match path.file_name() {
             None         => Err(ErrorKind::BadLocalPath(path.to_owned()).into()),
             Some(os_str) => match os_str.to_str() {
@@ -274,14 +274,14 @@ impl GscClient {
         }
     }
 
-    pub fn deauth(&mut self) -> Result<()> {
+    pub fn deauth(&self) -> Result<()> {
         let mut cookie_lock = self.config.new_cookie()?;
         cookie_lock.deauth();
         v2!("Deauthenticated.");
         Ok(())
     }
 
-    fn fetch_submissions(&mut self, user: &str)
+    fn fetch_submissions(&self, user: &str)
         -> Result<Vec<messages::SubmissionShort>> {
 
         let uri          = format!("{}/api/users/{}/submissions", self.config.get_endpoint(), user);
@@ -291,7 +291,7 @@ impl GscClient {
             .map_err(|e| Error::with_chain(e, "Could not understand response from server"))
     }
 
-    fn get_submission_uris(&mut self, user: &str) -> Result<Vec<Option<String>>> {
+    fn get_submission_uris(&self, user: &str) -> Result<Vec<Option<String>>> {
         let submissions = self.fetch_submissions(user)?;
         let mut result  = Vec::new();
 
@@ -308,17 +308,16 @@ impl GscClient {
         Ok(result)
     }
 
-    fn get_uri_for_submission(&mut self, user_option: Option<&str>, number: usize)
+    fn get_uri_for_submission(&self, user_option: Option<&str>, number: usize)
         -> Result<String> {
 
-        let user        = self.select_user(user_option);
+        let user      = self.select_user(user_option);
 
-        let mut cache   = replace(&mut self.submission_uris, HashMap::new());
-        let uris        = match cache.entry(user.clone()) {
+        let mut cache = self.submission_uris.borrow_mut();
+        let uris      = match cache.entry(user.clone()) {
             hash_map::Entry::Occupied(entry) => entry.into_mut(),
             hash_map::Entry::Vacant(entry)   => entry.insert(self.get_submission_uris(&user)?),
-        }.clone();
-        replace(&mut self.submission_uris, cache);
+        };
 
         match uris.get(number) {
             Some(Some(uri)) => Ok(uri.to_owned()),
@@ -326,13 +325,13 @@ impl GscClient {
         }
     }
 
-    fn get_uri_for_submission_files(&mut self, user: Option<&str>, number: usize)
+    fn get_uri_for_submission_files(&self, user: Option<&str>, number: usize)
         -> Result<String> {
 
         self.get_uri_for_submission(user, number).map(|uri| uri + "/files")
     }
 
-    pub fn fetch_file_list(&mut self,
+    pub fn fetch_file_list(&self,
                            user: Option<&str>,
                            rpat: &RemotePattern)
         -> Result<Vec<messages::FileMeta>>
@@ -349,7 +348,7 @@ impl GscClient {
                .collect())
     }
 
-    pub fn ls(&mut self, user: Option<&str>, rpat: &RemotePattern) -> Result<()> {
+    pub fn ls(&self, user: Option<&str>, rpat: &RemotePattern) -> Result<()> {
 
         let files     = self.fetch_file_list(user, &rpat)?;
         let mut table = table::TextTable::new("%r  %l  [%l] %l\n");
@@ -372,12 +371,12 @@ impl GscClient {
         Ok(())
     }
 
-    pub fn status_user(&mut self, _user: Option<&str>) -> Result<()> {
+    pub fn status_user(&self, _user: Option<&str>) -> Result<()> {
 
         Ok(())
     }
 
-    pub fn status_hw(&mut self, user: Option<&str>, number: usize) -> Result<()>
+    pub fn status_hw(&self, user: Option<&str>, number: usize) -> Result<()>
     {
         let uri          = self.get_uri_for_submission(user, number)?;
         let request      = self.http.get(&uri);
@@ -423,14 +422,14 @@ impl GscClient {
         Ok(())
     }
 
-    pub fn cat(&mut self, user: Option<&str>, pats: &[RemotePattern]) -> Result<()> {
+    pub fn cat(&self, user: Option<&str>, pats: &[RemotePattern]) -> Result<()> {
         for rpat in pats {
             let files = self.fetch_file_list(user, &rpat)?;
 
             if files.is_empty() {
                 let error = Error::from(ErrorKind::NoSuchRemoteFile(rpat.clone()));
                 ve1!("{}", error);
-                self.had_warning = true;
+                self.had_warning.set(true);
             }
 
             for file in files {
@@ -462,7 +461,7 @@ impl GscClient {
         Ok(())
     }
 
-    pub fn passwd(&mut self, user_option: Option<&str>) -> Result<()> {
+    pub fn passwd(&self, user_option: Option<&str>) -> Result<()> {
         let user         = self.select_user(user_option);
         let password     = get_matching_passwords(&user)?;
         let message      = messages::PasswordChange { password };
@@ -476,14 +475,14 @@ impl GscClient {
         Ok(())
     }
 
-    pub fn rm(&mut self, user: Option<&str>, pats: &[RemotePattern]) -> Result<()> {
+    pub fn rm(&self, user: Option<&str>, pats: &[RemotePattern]) -> Result<()> {
         for rpat in pats {
             let files = self.fetch_file_list(user, &rpat)?;
 
             if files.is_empty() {
                 let error = Error::from(ErrorKind::NoSuchRemoteFile(rpat.clone()));
                 ve1!("{}", error);
-                self.had_warning = true;
+                self.had_warning.set(true);
             }
 
             for file in files {
