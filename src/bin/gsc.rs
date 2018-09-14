@@ -238,28 +238,33 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
 
         else if let Some(submatches) = matches.subcommand_matches("partner") {
             process_common(submatches, config);
-            let me = submatches.value_of("ME").map(str::to_owned);
+            let me0 = submatches.value_of("ME");
 
-            fn process_partner(matches: &clap::ArgMatches, config: &mut config::Config)
-                -> Result< (usize, String)> {
-
-                process_common(matches, config);
-                let hw   = matches.value_of("HW").unwrap();
-                let them = matches.value_of("USER").unwrap();
-                Ok((parse_hw(hw)?, them.to_owned()))
-            }
+            let process_partner =
+                |matches: &clap::ArgMatches, config: &mut config::Config|
+                    -> Result<(Option<String>, usize, String)>
+                {
+                    process_common(matches, config);
+                    let hw   = matches.value_of("HW").unwrap();
+                    let them = matches.value_of("USER").unwrap();
+                    let me   = match matches.value_of("ME") {
+                        Some(username) => Some(username),
+                        None           => me0,
+                    }.map(str::to_owned);
+                    Ok((me, parse_hw(hw)?, them.to_owned()))
+                };
 
             if let Some(subsubmatches) = submatches.subcommand_matches("request") {
-                let (hw, them) = process_partner(subsubmatches, config)?;
+                let (me, hw, them) = process_partner(subsubmatches, config)?;
                 Ok(Command::PartnerRequest{me, hw, them})
             } else if let Some(subsubmatches) = submatches.subcommand_matches("accept") {
-                let (hw, them) = process_partner(subsubmatches, config)?;
+                let (me, hw, them) = process_partner(subsubmatches, config)?;
                 Ok(Command::PartnerAccept{me, hw, them})
             } else if let Some(subsubmatches) = submatches.subcommand_matches("cancel") {
-                let (hw, them) = process_partner(subsubmatches, config)?;
+                let (me, hw, them) = process_partner(subsubmatches, config)?;
                 Ok(Command::PartnerCancel{me, hw, them})
             } else {
-                Ok(Command::Partner{me})
+                Ok(Command::Partner{me: me0.map(str::to_owned)})
             }
         }
 
@@ -368,7 +373,9 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
     }
 
     fn add_partner_args(self) -> Self {
-        self.req_arg("HW", "The homework of the partner request")
+        self.add_user_opt("The user whose partners to manage")
+            .add_common()
+            .req_arg("HW", "The homework of the partner request")
             .req_arg("USER", "The other user of the partner request")
     }
 
