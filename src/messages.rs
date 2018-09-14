@@ -170,6 +170,7 @@ pub struct FileMeta {
 pub enum FilePurpose {
     Source,
     Test,
+    Config,
     Resource,
     Log,
 }
@@ -181,6 +182,7 @@ impl FilePurpose {
         match self {
             Source   => 's',
             Test     => 't',
+            Config   => 'c',
             Resource => 'r',
             Log      => 'l',
         }
@@ -192,8 +194,9 @@ impl FilePurpose {
         match self {
             Source   => "src",
             Test     => "test",
+            Config   => ".",
             Resource => "Resources",
-            Log      => ".",
+            Log      => "build",
         }
     }
 }
