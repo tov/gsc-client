@@ -94,6 +94,27 @@ impl GscClient {
         Ok(())
     }
 
+    pub fn admin_submissions(&self, hw: usize) -> Result<()> {
+
+        let uri        = format!("{}/api/submissions/hw{}", self.config.get_endpoint(), hw);
+        let request    = self.http.get(&uri);
+        let mut result = self.send_request(request)?;
+        let submissions: Vec<messages::SubmissionShort> = result.json()?;
+
+        let mut table = table::TextTable::new("%r  %l  %l\n");
+
+        for submission in &submissions {
+            table.add_row(table::Row::new()
+                .add_cell(submission.id)
+                .add_cell(format!("{}{}", self.config.get_endpoint(), submission.uri))
+                .add_cell(submission.status));
+        }
+
+        v1!("{}", table);
+
+        Ok(())
+    }
+
     pub fn auth(&mut self, username: &str) -> Result<()> {
         let uri = self.user_uri(username);
 

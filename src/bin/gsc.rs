@@ -17,6 +17,7 @@ fn main() {
 
 enum Command {
     AdminExtend{user: String, hw: usize, date: String, eval: bool},
+    AdminSubmissions{hw: usize},
     Auth{user: String},
     Cat{user: Option<String>, rpats: Vec<RemotePattern>},
     Create{user: String},
@@ -44,6 +45,7 @@ fn do_it() -> Result<bool> {
     match command {
         AdminExtend{user, hw, date, eval}
                                      => client.admin_extend(&user, hw, &date, eval),
+        AdminSubmissions{hw}         => client.admin_submissions(hw),
         Auth{user}                   => client.auth(&user),
         Cat{user, rpats}             => client.cat(bs(&user), &rpats),
         Create{user}                 => client.create(&user),
@@ -193,7 +195,11 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 let hw   = parse_hw(subsubmatches.value_of("HW").unwrap())?;
                 let user = subsubmatches.value_of("USER").unwrap().to_owned();
                 let date = subsubmatches.value_of("DATESPEC").unwrap().to_owned();
-                Ok(Command::AdminExtend{hw, user, date, eval})
+                Ok(Command::AdminExtend { hw, user, date, eval })
+            } else if let Some(subsubmatches) = submatches.subcommand_matches("submissions") {
+                process_common(submatches, config);
+                let hw   = parse_hw(subsubmatches.value_of("HW").unwrap())?;
+                Ok(Command::AdminSubmissions{hw})
             } else {
                 Err(ErrorKind::NoCommandGiven.into())
             }
@@ -334,6 +340,7 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
             .add_common()
             .subcommand(SubCommand::with_name("extend")
                 .about("Extends a due date")
+                .add_common()
                 .arg(Arg::with_name("EVAL")
                     .short("e")
                     .long("eval")
@@ -350,7 +357,14 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
                 .arg(Arg::with_name("DATESPEC")
                     .takes_value(true)
                     .required(true)
-                    .help("The new due date"))))
+                    .help("The new due date")))
+            .subcommand(SubCommand::with_name("submissions")
+                .about("Lists submissions for a given assignment")
+                .add_common()
+                .arg(Arg::with_name("HW")
+                    .takes_value(true)
+                    .required(true)
+                    .help("The assignment to query"))))
     }
 
     #[cfg(not(feature = "admin"))]
