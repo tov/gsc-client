@@ -12,6 +12,26 @@ pub struct ExamGrade {
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
+pub enum FilePurpose {
+    Source,
+    Test,
+    Config,
+    Resource,
+    Log,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct FileMeta {
+    pub byte_count:         usize,
+    pub media_type:         String,
+    pub name:               String,
+    pub purpose:            FilePurpose,
+    pub upload_time:        DateTime,
+    pub uri:                String,
+}
+
+#[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
 pub enum PartnerRequestStatus {
     Outgoing,
     Incoming,
@@ -26,12 +46,18 @@ pub struct PartnerRequest {
     pub status:             PartnerRequestStatus,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum UserRole {
     Student,
     Grader,
     Admin,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct UserShort {
+    pub name:               String,
+    pub uri:                String,
 }
 
 #[derive(Deserialize, Debug)]
@@ -44,22 +70,7 @@ pub struct User {
     pub submissions:        Vec<SubmissionShort>,
 }
 
-#[derive(Deserialize, Debug)]
-pub struct UserShort {
-    pub name:               String,
-    pub uri:                String,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct SubmissionShort {
-    pub assignment_number:  usize,
-    pub id:                 usize,
-    pub uri:                String,
-    pub status:             SubmissionStatus,
-    pub grade:              f64,
-}
-
-#[derive(Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum SubmissionStatus {
     Future,
@@ -70,12 +81,21 @@ pub enum SubmissionStatus {
     Closed,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum SubmissionEvalStatus {
     Empty,
     Started,
     Complete,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct SubmissionShort {
+    pub assignment_number:  usize,
+    pub id:                 usize,
+    pub uri:                String,
+    pub status:             SubmissionStatus,
+    pub grade:              f64,
 }
 
 #[derive(Deserialize, Debug)]
@@ -96,26 +116,6 @@ pub struct Submission {
     pub last_modified:      DateTime,
     pub eval_status:        SubmissionEvalStatus,
     pub status:             SubmissionStatus,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct FileMeta {
-    pub byte_count:         usize,
-    pub media_type:         String,
-    pub name:               String,
-    pub purpose:            FilePurpose,
-    pub upload_time:        DateTime,
-    pub uri:                String,
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "snake_case")]
-pub enum FilePurpose {
-    Source,
-    Test,
-    Config,
-    Resource,
-    Log,
 }
 
 #[derive(Serialize, Debug)]
