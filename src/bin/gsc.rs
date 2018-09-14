@@ -33,7 +33,7 @@ enum Command {
     Auth{user: String},
     Cat{user: Option<String>, rpats: Vec<RemotePattern>},
     Create{user: String},
-    Cp{user: Option<String>, srcs: Vec<CpArg>, dst: CpArg},
+    Cp{all: bool, user: Option<String>, srcs: Vec<CpArg>, dst: CpArg},
     Deauth,
     Ls{user: Option<String>, rpat: RemotePattern},
     Partner{me: Option<String>},
@@ -64,7 +64,7 @@ fn do_it() -> Result<bool> {
         Auth{user}                   => client.auth(&user),
         Cat{user, rpats}             => client.cat(bs(&user), &rpats),
         Create{user}                 => client.create(&user),
-        Cp{user, srcs, dst}          => client.cp(bs(&user), &srcs, &dst),
+        Cp{all, user, srcs, dst}     => client.cp(all, bs(&user), &srcs, &dst),
         Deauth                       => client.deauth(),
         Ls{user, rpat}               => client.ls(bs(&user), &rpat),
         Partner{me}                  => client.partner(bs(&me)),
@@ -214,7 +214,13 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             let mut rpats = Vec::new();
 
             for arg in submatches.values_of("FILE").unwrap() {
-                rpats.push(parse_hw_file(arg, false)?);
+                let rpat = parse_hw_file(arg)?;
+
+                if rpat.is_whole_hw() {
+                    Err(ErrorKind::CannotCatWholeHomework)?;
+                }
+
+                rpats.push(rpat);
             }
 
             Ok(Command::Cat{user, rpats})
@@ -231,13 +237,19 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             let user     = submatches.value_of("ME").map(str::to_owned);
             let all      = submatches.is_present("ALL");
             let mut srcs = Vec::new();
-            let dst      = parse_cp_arg(submatches.value_of("DST").unwrap(), true)?;
+            let dst      = parse_cp_arg(submatches.value_of("DST").unwrap())?;
 
             for src in submatches.values_of("SRC").unwrap() {
-                srcs.push(parse_cp_arg(src, all)?);
+                let arg = parse_cp_arg(src)?;
+
+                if arg.is_whole_hw() && !all {
+                    Err(ErrorKind::CommandRequiresFlag("cp".to_owned()))?;
+                }
+
+                srcs.push(arg);
             }
 
-            Ok(Command::Cp{user, srcs, dst})
+            Ok(Command::Cp{all, user, srcs, dst})
         }
 
         else if let Some(submatches) = matches.subcommand_matches("deauth") {
@@ -298,7 +310,13 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             let mut rpats = Vec::new();
 
             for arg in submatches.values_of("FILE").unwrap() {
-                rpats.push(parse_hw_file(arg, all)?);
+                let rpat = parse_hw_file(arg)?;
+
+                if rpat.is_whole_hw() && !all {
+                    Err(ErrorKind::CommandRequiresFlag("rm".to_owned()))?;
+                }
+
+                rpats.push(rpat);
             }
 
             Ok(Command::Rm{user, rpats})
@@ -494,19 +512,9 @@ fn parse_hw_opt_file(spec: &str) -> Result<(usize, String)> {
     Ok((hw_number, pattern))
 }
 
-fn parse_hw_file(file_spec: &str, allow_bare: bool) -> Result<RemotePattern> {
-    let re = if allow_bare {&*re::HW_FILE} else {&*re::HW_FILE_NE};
-
-    let err = || {
-        let message = if allow_bare {
-            "remote file or homework spec"
-        } else {
-            "remote file spec"
-        };
-        syntax_error(message, file_spec)
-    };
-
-    let captures  = re.captures(file_spec).ok_or_else(err)?;
+fn parse_hw_file(file_spec: &str) -> Result<RemotePattern> {
+    let captures  = re::HW_FILE.captures(file_spec)
+        .ok_or_else(|| syntax_error("remote file or homework spec", file_spec))?;
     let capture1  = captures.get(1).unwrap().as_str();
     let capture2  = captures.get(2).unwrap().as_str();
     let hw        = capture1.parse().unwrap();
@@ -514,16 +522,17 @@ fn parse_hw_file(file_spec: &str, allow_bare: bool) -> Result<RemotePattern> {
     Ok(RemotePattern{hw, pat})
 }
 
-fn parse_cp_arg(spec: &str, allow_bare: bool) -> Result<CpArg> {
+fn parse_cp_arg(spec: &str) -> Result<CpArg> {
     if spec.is_empty() {
         Err(syntax_error("file name", spec))?
     } else if let Some(captures) = re::LOCAL_FILE.captures(spec) {
         let filename = captures.get(1).unwrap().as_str().to_owned();
         Ok(CpArg::Local(filename.into()))
     } else if let Some(_) = spec.find(':') {
-        let rp = parse_hw_file(spec, allow_bare)?;
+        let rp = parse_hw_file(spec)?;
         Ok(CpArg::Remote(rp))
     } else {
         Ok(CpArg::Local(spec.into()))
     }
 }
+

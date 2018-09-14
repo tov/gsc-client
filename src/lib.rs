@@ -136,16 +136,16 @@ impl GscClient {
         }
     }
 
-    pub fn cp(&self, user: Option<&str>, srcs: &[CpArg], dst: &CpArg)
+    pub fn cp(&self, all: bool, user: Option<&str>, srcs: &[CpArg], dst: &CpArg)
         -> Result<()> {
 
         match dst {
-            CpArg::Local(filename) => self.cp_dn(user, srcs, filename),
+            CpArg::Local(filename) => self.cp_dn(all, user, srcs, filename),
             CpArg::Remote(rpat)    => self.cp_up(user, srcs, rpat),
         }
     }
 
-    fn cp_dn(&self, user: Option<&str>, raw_srcs: &[CpArg], dst: &Path)
+    fn cp_dn(&self, all: bool, user: Option<&str>, raw_srcs: &[CpArg], dst: &Path)
         -> Result<()> {
 
         let mut src_rpats = Vec::new();
@@ -180,11 +180,9 @@ impl GscClient {
         };
 
         let mut src_files = Vec::new();
-        let mut any_whole = false;
 
         for src_rpat in &src_rpats {
             let whole_hw = src_rpat.pat.is_empty();
-            any_whole |= whole_hw;
             src_files.extend(
                 self.fetch_file_list(user, src_rpat)?
                     .into_iter()
@@ -218,7 +216,7 @@ impl GscClient {
             // cp FILE... DIR_DNE
             _ => {
                 // cp -a ...
-                if any_whole {
+                if all {
                     soft_create_dir(dst)?;
                 }
 
@@ -805,6 +803,21 @@ fn soft_create_dir(path: &Path) -> Result<()> {
         Ok(_)  => Ok(()),
         Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
         Err(e) => Err(e)?,
+    }
+}
+
+impl RemotePattern {
+    pub fn is_whole_hw(&self) -> bool {
+        self.pat.is_empty()
+    }
+}
+
+impl CpArg {
+    pub fn is_whole_hw(&self) -> bool {
+        match self {
+            CpArg::Local(_)     => false,
+            CpArg::Remote(rpat) => rpat.is_whole_hw(),
+        }
     }
 }
 

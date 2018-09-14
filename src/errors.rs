@@ -106,6 +106,16 @@ error_chain! {
             display("Cannot copy source directory ‘hw{}’ over file destination ‘{}’.",
                     src, dst.display())
         }
+
+        CannotCatWholeHomework {
+            description("cannot cat whole homework")
+            display("You cannot ‘cat’ a whole homework.")
+        }
+
+        CommandRequiresFlag(command: String) {
+            description("command requires ‘-a’ flag")
+            display("To ‘{}’ a whole homework, you must provide the ‘-a’ flag.", command)
+        }
     }
 }
 
