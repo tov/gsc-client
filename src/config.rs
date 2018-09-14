@@ -20,6 +20,7 @@ pub struct Config {
     dotfile:    Option<PathBuf>,
     username:   String,
     endpoint:   String,
+    on_behalf:  Option<String>,
 }
 
 impl Config {
@@ -40,7 +41,16 @@ impl Config {
             dotfile,
             username:   String::new(),
             endpoint:   API_ENDPOINT.to_owned(),
+            on_behalf:  None,
         }
+    }
+
+    pub fn get_on_behalf(&self) -> Option<&str> {
+        self.on_behalf.as_ref().map(String::as_str)
+    }
+
+    pub fn set_on_behalf(&mut self, username: String) {
+        self.on_behalf = Some(username);
     }
 
     pub fn get_endpoint(&self) -> &str {
