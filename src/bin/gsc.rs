@@ -22,6 +22,7 @@ enum Command {
     Cp{user: Option<String>, srcs: Vec<CpArg>, dst: CpArg},
     Deauth,
     Ls{user: Option<String>, rpat: RemotePattern},
+    Partner{me: Option<String>},
     PartnerRequest{me: Option<String>, hw: usize, them: String},
     PartnerAccept{me: Option<String>, hw: usize, them: String},
     PartnerCancel{me: Option<String>, hw: usize, them: String},
@@ -46,6 +47,7 @@ fn do_it() -> Result<bool> {
         Cp{user, srcs, dst}          => client.cp(bs(&user), &srcs, &dst),
         Deauth                       => client.deauth(),
         Ls{user, rpat}               => client.ls(bs(&user), &rpat),
+        Partner{me}                  => client.partner(bs(&me)),
         PartnerRequest{me, hw, them} => client.partner_request(bs(&me), hw, &them),
         PartnerAccept{me, hw, them}  => client.partner_accept(bs(&me), hw, &them),
         PartnerCancel{me, hw, them}  => client.partner_cancel(bs(&me), hw, &them),
@@ -252,7 +254,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 let (hw, them) = process_partner(subsubmatches, config)?;
                 Ok(Command::PartnerCancel{me, hw, them})
             } else {
-                Err(ErrorKind::NoPartnerSubcommandGiven.into())
+                Ok(Command::Partner{me})
             }
         }
 

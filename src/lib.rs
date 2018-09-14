@@ -431,6 +431,17 @@ impl GscClient {
         }
 
         if !user.partner_requests.is_empty() {
+            self.print_partner_status(&user, "  ");
+            v1!("Partner requests can be managed with the ‘gsc partner’ command.");
+        }
+
+        Ok(())
+    }
+
+    fn print_partner_status(&self, user: &messages::User, indent: &str) {
+        if user.partner_requests.is_empty() {
+            ve1!("No outstanding partner requests.");
+        } else {
             let mut table = table::TextTable::new("    %l %l\n");
 
             for p in &user.partner_requests {
@@ -446,12 +457,8 @@ impl GscClient {
                     .add_cell(message));
             }
 
-            v1!("  Partner requests:\n{}", table);
-
-            v1!("Partner requests can be managed with the ‘gsc partner’ command.");
+            v1!("{}Partner requests:\n{}", indent, table);
         }
-
-        Ok(())
     }
 
     pub fn status_hw(&self, user: Option<&str>, number: usize) -> Result<()>
@@ -536,6 +543,16 @@ impl GscClient {
 
         v2!("Created account: {}.", username);
 
+        Ok(())
+    }
+
+    pub fn partner(&self, me_opt: Option<&str>) -> Result<()> {
+        let user         = self.select_user(me_opt);
+        let uri          = self.user_uri(&user);
+        let request      = self.http.get(&uri);
+        let mut response = self.send_request(request)?;
+        let user: messages::User = response.json()?;
+        self.print_partner_status(&user, "");
         Ok(())
     }
 

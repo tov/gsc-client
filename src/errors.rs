@@ -54,11 +54,6 @@ error_chain! {
             display("No subcommand given; pass -h for help.")
         }
 
-        NoPartnerSubcommandGiven {
-            description("no partner subcommand given")
-            display("The ‘gsc partner’ command requires a subcommand; pass -h for help.")
-        }
-
         LoginPlease {
             description("login please")
             display("You are not logged in; use the ‘gsc auth’ command to authenticate.")
