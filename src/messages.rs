@@ -1,15 +1,9 @@
 use serde_derive::{Serialize, Deserialize};
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug)]
 pub struct DateTime(chrono::DateTime<chrono::offset::FixedOffset>);
 
-impl std::fmt::Display for DateTime {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.0.format("%b %d %H:%M"))
-    }
-}
-
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct ExamGrade {
     pub number:             usize,
     pub points:             usize,
@@ -76,6 +70,82 @@ pub enum SubmissionStatus {
     Closed,
 }
 
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum SubmissionEvalStatus {
+    Empty,
+    Started,
+    Complete,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Submission {
+    pub assignment_number:  usize,
+    pub id:                 usize,
+    pub uri:                String,
+    pub grade:              f64,
+    pub files_uri:          String,
+    pub owner1:             UserShort,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner2:             Option<UserShort>,
+    pub bytes_used:         usize,
+    pub bytes_quota:        usize,
+    pub open_date:          DateTime,
+    pub due_date:           DateTime,
+    pub eval_date:          DateTime,
+    pub last_modified:      DateTime,
+    pub eval_status:        SubmissionEvalStatus,
+    pub status:             SubmissionStatus,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct FileMeta {
+    pub byte_count:         usize,
+    pub media_type:         String,
+    pub name:               String,
+    pub purpose:            FilePurpose,
+    pub upload_time:        DateTime,
+    pub uri:                String,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum FilePurpose {
+    Source,
+    Test,
+    Config,
+    Resource,
+    Log,
+}
+
+#[derive(Serialize, Debug)]
+pub struct UserChange {
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub exam_grades:      Vec<ExamGrade>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub partner_requests: Vec<PartnerRequest>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub password:         Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role:             Option<UserRole>,
+}
+
+#[derive(Serialize, Debug)]
+pub struct SubmissionChange {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub due_date:           Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eval_date:          Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bytes_quota:        Option<usize>,
+}
+
+impl std::fmt::Display for DateTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.0.format("%b %d %H:%M"))
+    }
+}
+
 impl SubmissionStatus {
     fn to_str(&self) -> &'static str {
         use self::SubmissionStatus::*;
@@ -105,14 +175,6 @@ impl std::fmt::Display for SubmissionStatus {
     }
 }
 
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "snake_case")]
-pub enum SubmissionEvalStatus {
-    Empty,
-    Started,
-    Complete,
-}
-
 impl SubmissionEvalStatus {
     fn to_str(&self) -> &'static str {
         use self::SubmissionEvalStatus::*;
@@ -130,50 +192,20 @@ impl std::fmt::Display for SubmissionEvalStatus {
     }
 }
 
-#[derive(Deserialize, Debug)]
-pub struct Submission {
-    pub assignment_number:  usize,
-    pub id:                 usize,
-    pub uri:                String,
-    pub grade:              f64,
-    pub files_uri:          String,
-    pub owner1:             UserShort,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub owner2:             Option<UserShort>,
-    pub bytes_used:         usize,
-    pub bytes_quota:        usize,
-    pub open_date:          DateTime,
-    pub due_date:           DateTime,
-    pub eval_date:          DateTime,
-    pub last_modified:      DateTime,
-    pub eval_status:        SubmissionEvalStatus,
-    pub status:             SubmissionStatus,
-}
-
 impl Submission {
     pub fn quota_remaining(&self) -> f32 {
         100.0 * (self.bytes_quota - self.bytes_used) as f32 / self.bytes_quota as f32
     }
 }
 
-#[derive(Deserialize, Debug)]
-pub struct FileMeta {
-    pub byte_count:         usize,
-    pub media_type:         String,
-    pub name:               String,
-    pub purpose:            FilePurpose,
-    pub upload_time:        DateTime,
-    pub uri:                String,
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "snake_case")]
-pub enum FilePurpose {
-    Source,
-    Test,
-    Config,
-    Resource,
-    Log,
+impl Default for SubmissionChange {
+    fn default() -> Self {
+        SubmissionChange {
+            due_date:       None,
+            eval_date:      None,
+            bytes_quota:    None,
+        }
+    }
 }
 
 impl FilePurpose {
@@ -202,42 +234,13 @@ impl FilePurpose {
     }
 }
 
-#[derive(Serialize, Debug)]
-pub struct UserChange {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub partner_requests: Option<Vec<PartnerRequest>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub password:         Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub role:             Option<UserRole>,
-}
-
 impl Default for UserChange {
     fn default() -> Self {
         UserChange {
-            partner_requests: None,
+            exam_grades:      Vec::new(),
+            partner_requests: Vec::new(),
             password:         None,
             role:             None,
-        }
-    }
-}
-
-#[derive(Serialize, Debug)]
-pub struct SubmissionChange {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub due_date:           Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub eval_date:          Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub bytes_quota:        Option<usize>,
-}
-
-impl Default for SubmissionChange {
-    fn default() -> Self {
-        SubmissionChange {
-            due_date:       None,
-            eval_date:      None,
-            bytes_quota:    None,
         }
     }
 }

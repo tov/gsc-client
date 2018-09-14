@@ -33,34 +33,6 @@ pub enum CpArg {
     Remote(RemotePattern),
 }
 
-pub (crate) fn parse_cookie(cookie: &str) -> Option<(String, String)> {
-    let pair = match cookie.find(';') {
-        Some(index) => &cookie[.. index],
-        None        => cookie,
-    };
-
-    pair.find('=').map(|index| {
-        let key   = pair[.. index].to_owned();
-        let value = pair[index + 1 ..].to_owned();
-        (key, value)
-    })
-}
-
-pub fn parse_cookies(chunks: &[String]) -> Option<(String, String)> {
-    for chunk in chunks {
-        if let Some(pair) = parse_cookie(&chunk) {
-            return Some(pair);
-        }
-    }
-
-    None
-}
-
-fn glob(pattern: &str) -> Result<globset::GlobMatcher> {
-    let real_pattern = if pattern.is_empty() { "*" } else { pattern };
-    Ok(globset::Glob::new(real_pattern)?.compile_matcher())
-}
-
 impl GscClient {
     pub fn new(config: config::Config) -> Result<Self> {
         Ok(GscClient {
@@ -149,8 +121,8 @@ impl GscClient {
         }
     }
 
-    pub fn cp_dn(&self, user: Option<&str>, raw_srcs: &[CpArg], dst: &Path)
-              -> Result<()> {
+    fn cp_dn(&self, user: Option<&str>, raw_srcs: &[CpArg], dst: &Path)
+        -> Result<()> {
 
         let mut src_rpats = Vec::new();
 
@@ -242,8 +214,24 @@ impl GscClient {
         Ok(())
     }
 
-    pub fn cp_up(&self, user: Option<&str>, raw_srcs: &[CpArg], dst: &RemotePattern)
-                 -> Result<()> {
+    fn download_file(&self, src: &RemotePattern, rel_uri: &str, dst: &Path) -> Result<()> {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(dst)?;
+
+        let uri          = format!("{}{}", self.config.get_endpoint(), rel_uri);
+        let request      = self.http.get(&uri);
+        ve2!("Downloading ‘{}’ -> ‘{}’...", src, dst.display());
+        let mut response = self.send_request(request)?;
+        response.copy_to(&mut file)?;
+
+        Ok(())
+    }
+
+    fn cp_up(&self, user: Option<&str>, raw_srcs: &[CpArg], dst: &RemotePattern)
+        -> Result<()> {
 
         let mut srcs = Vec::new();
 
@@ -303,22 +291,6 @@ impl GscClient {
         Ok(())
     }
 
-    fn download_file(&self, src: &RemotePattern, rel_uri: &str, dst: &Path) -> Result<()> {
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(dst)?;
-
-        let uri          = format!("{}{}", self.config.get_endpoint(), rel_uri);
-        let request      = self.http.get(&uri);
-        ve2!("Downloading ‘{}’ -> ‘{}’...", src, dst.display());
-        let mut response = self.send_request(request)?;
-        response.copy_to(&mut file)?;
-
-        Ok(())
-    }
-
     fn get_base_filename<'a>(&self, path: &'a Path) -> Result<&'a str> {
         match path.file_name() {
             None         => Err(ErrorKind::BadLocalPath(path.to_owned()).into()),
@@ -336,71 +308,43 @@ impl GscClient {
         Ok(())
     }
 
-    fn fetch_submissions(&self, user: &str)
-        -> Result<Vec<messages::SubmissionShort>> {
+    pub fn cat(&self, user: Option<&str>, pats: &[RemotePattern]) -> Result<()> {
+        for rpat in pats {
+            let files = self.fetch_file_list(user, &rpat)?;
 
-        let uri          = self.user_uri(user) + "/submissions";
-        let request      = self.http.get(&uri);
-        let mut response = self.send_request(request)?;
-        response.json()
-            .map_err(|e| Error::with_chain(e, "Could not understand response from server"))
-    }
-
-    fn get_submission_uris(&self, user: &str) -> Result<Vec<Option<String>>> {
-        let submissions = self.fetch_submissions(user)?;
-        let mut result  = Vec::new();
-
-        for submission in &submissions {
-            let number = submission.assignment_number;
-
-            while number >= result.len() {
-                result.push(None);
+            if files.is_empty() {
+                let error = Error::from(ErrorKind::NoSuchRemoteFile(rpat.clone()));
+                ve1!("{}", error);
+                self.had_warning.set(true);
             }
 
-            result[number] = Some(format!("{}{}", self.config.get_endpoint(), submission.uri));
+            for file in files {
+                let uri          = format!("{}{}", self.config.get_endpoint(), file.uri);
+                let request      = self.http.get(&uri);
+                let mut response = self.send_request(request)?;
+                response.copy_to(&mut std::io::stdout())?;
+            }
         }
 
-        Ok(result)
+        Ok(())
     }
 
-    fn get_uri_for_submission(&self, user_option: Option<&str>, number: usize)
-        -> Result<String> {
+    pub fn create(&mut self, username: &str) -> Result<()> {
+        self.config.set_username(username.to_owned());
 
-        let user      = self.select_user(user_option);
+        let password = get_matching_passwords(username)?;
+        let uri      = format!("{}/api/users", self.config.get_endpoint());
 
-        let mut cache = self.submission_uris.borrow_mut();
-        let uris      = match cache.entry(user.clone()) {
-            hash_map::Entry::Occupied(entry) => entry.into_mut(),
-            hash_map::Entry::Vacant(entry)   => entry.insert(self.get_submission_uris(&user)?),
-        };
+        ve3!("> Sending request to {}", uri);
+        let mut response = self.http.post(&uri)
+            .basic_auth(username, Some(password))
+            .send()?;
+        let cookie_lock = self.config.new_cookie()?;
+        self.handle_response(&mut response, cookie_lock)?;
 
-        match uris.get(number) {
-            Some(Some(uri)) => Ok(uri.to_owned()),
-            _               => Err(ErrorKind::UnknownHomework(number).into()),
-        }
-    }
+        v2!("Created account: {}.", username);
 
-    fn get_uri_for_submission_files(&self, user: Option<&str>, number: usize)
-        -> Result<String> {
-
-        self.get_uri_for_submission(user, number).map(|uri| uri + "/files")
-    }
-
-    pub fn fetch_file_list(&self,
-                           user: Option<&str>,
-                           rpat: &RemotePattern)
-        -> Result<Vec<messages::FileMeta>>
-    {
-        let matcher      = glob(&rpat.pat)?;
-        let uri          = self.get_uri_for_submission_files(user, rpat.hw)?;
-        let request      = self.http.get(&uri);
-        let mut response = self.send_request(request)?;
-
-        let files: Vec<messages::FileMeta> = response.json()?;
-
-        Ok(files.into_iter()
-               .filter(|file| matcher.is_match(&file.name))
-               .collect())
+        Ok(())
     }
 
     pub fn ls(&self, user: Option<&str>, rpat: &RemotePattern) -> Result<()> {
@@ -421,6 +365,142 @@ impl GscClient {
                     .add_cell(&file.name));
         }
 
+        v1!("{}", table);
+
+        Ok(())
+    }
+
+    pub fn partner(&self, me_opt: Option<&str>) -> Result<()> {
+        let user         = self.select_user(me_opt);
+        let uri          = self.user_uri(&user);
+        let request      = self.http.get(&uri);
+        let mut response = self.send_request(request)?;
+        let user: messages::User = response.json()?;
+        self.print_partner_status(&user, "");
+        Ok(())
+    }
+
+    pub fn partner_request(&self, me_opt: Option<&str>, hw: usize, them: &str) -> Result<()> {
+        self.partner_operation(messages::PartnerRequestStatus::Outgoing, me_opt, hw, them)?;
+        v2!("Request sent.");
+        Ok(())
+    }
+
+    pub fn partner_accept(&self, me_opt: Option<&str>, hw: usize, them: &str)-> Result<()> {
+        self.partner_operation(messages::PartnerRequestStatus::Accepted, me_opt, hw, them)?;
+        v2!("Request accepted.");
+        Ok(())
+    }
+
+    pub fn partner_cancel(&self, me_opt: Option<&str>, hw: usize, them: &str)-> Result<()> {
+        self.partner_operation(messages::PartnerRequestStatus::Canceled, me_opt, hw, them)?;
+        v2!("Request canceled.");
+        Ok(())
+    }
+
+    fn partner_operation(&self,
+                         op: messages::PartnerRequestStatus,
+                         me_opt: Option<&str>,
+                         hw: usize,
+                         them: &str)
+        -> Result<()> {
+
+        let me          = self.select_user(me_opt);
+        let uri         = self.user_uri(&me);
+        let mut message = messages::UserChange::default();
+        message.partner_requests = vec![
+            messages::PartnerRequest {
+                assignment_number:  hw,
+                user:               them.to_owned(),
+                status:             op,
+            }
+        ];
+
+        let mut request = self.http.patch(&uri);
+        request.json(&message);
+        self.send_request(request)?;
+
+        Ok(())
+    }
+
+    pub fn passwd(&self, user_option: Option<&str>) -> Result<()> {
+        let user         = self.select_user(user_option);
+        let password     = get_matching_passwords(&user)?;
+        let mut message  = messages::UserChange::default();
+        message.password = Some(password);
+        let uri          = self.user_uri(&user);
+        let mut request  = self.http.patch(&uri);
+        request.json(&message);
+        self.send_request(request)?;
+
+        v2!("Changed password for user {}.", user);
+
+        Ok(())
+    }
+
+    pub fn rm(&self, user: Option<&str>, pats: &[RemotePattern]) -> Result<()> {
+        for rpat in pats {
+            let files = self.fetch_file_list(user, &rpat)?;
+
+            if files.is_empty() {
+                let error = Error::from(ErrorKind::NoSuchRemoteFile(rpat.clone()));
+                ve1!("{}", error);
+                self.had_warning.set(true);
+            }
+
+            for file in files {
+                let uri          = format!("{}{}", self.config.get_endpoint(), file.uri);
+                let request      = self.http.delete(&uri);
+                v2!("Deleting remote file ‘hw{}:{}’...", rpat.hw, file.name);
+                self.send_request(request)?;
+            }
+        }
+
+        v2!("Done.");
+        Ok(())
+    }
+
+    pub fn status_hw(&self, user: Option<&str>, number: usize) -> Result<()>
+    {
+        let uri          = self.get_uri_for_submission(user, number)?;
+        let request      = self.http.get(&uri);
+        let mut response = self.send_request(request)?;
+
+        let submission: messages::Submission = response.json()?;
+        let in_evaluation   = submission.status.is_self_eval();
+        let quota_remaining = submission.quota_remaining();
+
+        let mut table = table::TextTable::new("  %l  %l\n");
+        table.add_row(table::Row::new().add_cell("Submission status:")
+            .add_cell(submission.status));
+
+        if in_evaluation {
+            table.add_row(table::Row::new().add_cell("Evaluation status:")
+                .add_cell(submission.eval_status));
+        }
+
+        table
+            .add_row(table::Row::new().add_cell("Open date:")
+                .add_cell(submission.open_date))
+            .add_row(table::Row::new().add_cell("Submission due date:")
+                .add_cell(submission.due_date))
+            .add_row(table::Row::new().add_cell("Self-eval due date:")
+                .add_cell(submission.eval_date))
+            .add_row(table::Row::new().add_cell("Last modified:")
+                .add_cell(submission.last_modified))
+            .add_row(table::Row::new().add_cell("Quota remaining:")
+                .add_cell(format!("{:.1}% ({}/{} bytes used)",
+                                  quota_remaining,
+                                  submission.bytes_used,
+                                  submission.bytes_quota)));
+
+        let mut owners = submission.owner1.name.clone();
+        if let Some(owner2) = &submission.owner2 {
+            owners += " and ";
+            owners += &owner2.name;
+        }
+
+        v1!("hw{} ({})", number, owners);
         v1!("{}", table);
 
         Ok(())
@@ -478,6 +558,105 @@ impl GscClient {
         Ok(())
     }
 
+    pub fn whoami(&self) -> Result<()> {
+        let username = self.config.get_username();
+
+        if username.is_empty() {
+            return Err(ErrorKind::LoginPlease.into())
+        }
+
+        v1!("{}", username);
+        Ok(())
+    }
+
+    // Helper methods
+
+    fn fetch_file_list(&self, user: Option<&str>, rpat: &RemotePattern)
+                       -> Result<Vec<messages::FileMeta>>
+    {
+        let matcher      = glob(&rpat.pat)?;
+        let uri          = self.get_uri_for_submission_files(user, rpat.hw)?;
+        let request      = self.http.get(&uri);
+        let mut response = self.send_request(request)?;
+
+        let files: Vec<messages::FileMeta> = response.json()?;
+
+        Ok(files.into_iter()
+            .filter(|file| matcher.is_match(&file.name))
+            .collect())
+    }
+
+    fn fetch_submissions(&self, user: &str)
+                         -> Result<Vec<messages::SubmissionShort>> {
+
+        let uri          = self.user_uri(user) + "/submissions";
+        let request      = self.http.get(&uri);
+        let mut response = self.send_request(request)?;
+        response.json()
+            .map_err(|e| Error::with_chain(e, "Could not understand response from server"))
+    }
+
+    fn get_submission_uris(&self, user: &str) -> Result<Vec<Option<String>>> {
+        let submissions = self.fetch_submissions(user)?;
+        let mut result  = Vec::new();
+
+        for submission in &submissions {
+            let number = submission.assignment_number;
+
+            while number >= result.len() {
+                result.push(None);
+            }
+
+            result[number] = Some(format!("{}{}", self.config.get_endpoint(), submission.uri));
+        }
+
+        Ok(result)
+    }
+
+    fn get_uri_for_submission(&self, user_option: Option<&str>, number: usize)
+                              -> Result<String> {
+
+        let user      = self.select_user(user_option);
+
+        let mut cache = self.submission_uris.borrow_mut();
+        let uris      = match cache.entry(user.clone()) {
+            hash_map::Entry::Occupied(entry) => entry.into_mut(),
+            hash_map::Entry::Vacant(entry)   => entry.insert(self.get_submission_uris(&user)?),
+        };
+
+        match uris.get(number) {
+            Some(Some(uri)) => Ok(uri.to_owned()),
+            _               => Err(ErrorKind::UnknownHomework(number).into()),
+        }
+    }
+
+    fn get_uri_for_submission_files(&self, user: Option<&str>, number: usize)
+                                    -> Result<String> {
+
+        self.get_uri_for_submission(user, number).map(|uri| uri + "/files")
+    }
+
+    fn handle_response(&self, response: &mut reqwest::Response, cookie_lock: DotfileLock)
+                       -> Result<()> {
+
+        self.save_cookie(response, cookie_lock)?;
+
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            let error = response.json()?;
+            Err(ErrorKind::ServerError(error))?
+        }
+    }
+
+    fn prepare_cookie(&self, request: &mut reqwest::RequestBuilder) -> Result<DotfileLock> {
+        let cookie_lock = self.config.lock_dotfile()?;
+        let cookie      = cookie_lock.get_cookie_header();
+        ve3!("> Sending cookie {}", cookie);
+        request.header(cookie);
+        Ok(cookie_lock)
+    }
+
     fn print_partner_status(&self, user: &messages::User, indent: &str) {
         if user.partner_requests.is_empty() {
             ve1!("No outstanding partner requests.");
@@ -501,201 +680,21 @@ impl GscClient {
         }
     }
 
-    pub fn status_hw(&self, user: Option<&str>, number: usize) -> Result<()>
-    {
-        let uri          = self.get_uri_for_submission(user, number)?;
-        let request      = self.http.get(&uri);
-        let mut response = self.send_request(request)?;
-
-        let submission: messages::Submission = response.json()?;
-        let in_evaluation   = submission.status.is_self_eval();
-        let quota_remaining = submission.quota_remaining();
-
-        let mut table = table::TextTable::new("  %l  %l\n");
-        table.add_row(table::Row::new().add_cell("Submission status:")
-            .add_cell(submission.status));
-
-        if in_evaluation {
-            table.add_row(table::Row::new().add_cell("Evaluation status:")
-                .add_cell(submission.eval_status));
-        }
-
-        table
-            .add_row(table::Row::new().add_cell("Open date:")
-                .add_cell(submission.open_date))
-            .add_row(table::Row::new().add_cell("Submission due date:")
-                .add_cell(submission.due_date))
-            .add_row(table::Row::new().add_cell("Self-eval due date:")
-                .add_cell(submission.eval_date))
-            .add_row(table::Row::new().add_cell("Last modified:")
-                .add_cell(submission.last_modified))
-            .add_row(table::Row::new().add_cell("Quota remaining:")
-                .add_cell(format!("{:.1}% ({}/{} bytes used)",
-                                  quota_remaining,
-                                  submission.bytes_used,
-                                  submission.bytes_quota)));
-
-        let mut owners = submission.owner1.name.clone();
-        if let Some(owner2) = &submission.owner2 {
-            owners += " and ";
-            owners += &owner2.name;
-        }
-
-        v1!("hw{} ({})", number, owners);
-        v1!("{}", table);
-
-        Ok(())
-    }
-
-    pub fn cat(&self, user: Option<&str>, pats: &[RemotePattern]) -> Result<()> {
-        for rpat in pats {
-            let files = self.fetch_file_list(user, &rpat)?;
-
-            if files.is_empty() {
-                let error = Error::from(ErrorKind::NoSuchRemoteFile(rpat.clone()));
-                ve1!("{}", error);
-                self.had_warning.set(true);
-            }
-
-            for file in files {
-                let uri          = format!("{}{}", self.config.get_endpoint(), file.uri);
-                let request      = self.http.get(&uri);
-                let mut response = self.send_request(request)?;
-                response.copy_to(&mut std::io::stdout())?;
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn create(&mut self, username: &str) -> Result<()> {
-        self.config.set_username(username.to_owned());
-
-        let password = get_matching_passwords(username)?;
-        let uri      = format!("{}/api/users", self.config.get_endpoint());
-
-        ve3!("> Sending request to {}", uri);
-        let mut response = self.http.post(&uri)
-            .basic_auth(username, Some(password))
-            .send()?;
-        let cookie_lock = self.config.new_cookie()?;
-        self.handle_response(&mut response, cookie_lock)?;
-
-        v2!("Created account: {}.", username);
-
-        Ok(())
-    }
-
-    pub fn partner(&self, me_opt: Option<&str>) -> Result<()> {
-        let user         = self.select_user(me_opt);
-        let uri          = self.user_uri(&user);
-        let request      = self.http.get(&uri);
-        let mut response = self.send_request(request)?;
-        let user: messages::User = response.json()?;
-        self.print_partner_status(&user, "");
-        Ok(())
-    }
-
-    pub fn partner_request(&self, me_opt: Option<&str>, hw: usize, them: &str) -> Result<()> {
-        self.partner_operation(messages::PartnerRequestStatus::Outgoing, me_opt, hw, them)?;
-        v2!("Request sent.");
-        Ok(())
-    }
-
-    pub fn partner_accept(&self, me_opt: Option<&str>, hw: usize, them: &str)-> Result<()> {
-        self.partner_operation(messages::PartnerRequestStatus::Accepted, me_opt, hw, them)?;
-        v2!("Request accepted.");
-        Ok(())
-    }
-
-    pub fn partner_cancel(&self, me_opt: Option<&str>, hw: usize, them: &str)-> Result<()> {
-        self.partner_operation(messages::PartnerRequestStatus::Canceled, me_opt, hw, them)?;
-        v2!("Request canceled.");
-        Ok(())
-    }
-
-    pub fn partner_operation(&self,
-                             op: messages::PartnerRequestStatus,
-                             me_opt: Option<&str>,
-                             hw: usize,
-                             them: &str)
-        -> Result<()> {
-
-        let me          = self.select_user(me_opt);
-        let uri         = self.user_uri(&me);
-        let mut message = messages::UserChange::default();
-        message.partner_requests = Some(vec![
-            messages::PartnerRequest {
-                assignment_number:  hw,
-                user:               them.to_owned(),
-                status:             op,
-            }
-        ]);
-
-        let mut request = self.http.patch(&uri);
-        request.json(&message);
-        self.send_request(request)?;
-
-        Ok(())
-    }
-
     fn user_uri(&self, user: &str) -> String {
         format!("{}/api/users/{}", self.config.get_endpoint(), user)
     }
 
-    pub fn passwd(&self, user_option: Option<&str>) -> Result<()> {
-        let user         = self.select_user(user_option);
-        let password     = get_matching_passwords(&user)?;
-        let mut message  = messages::UserChange::default();
-        message.password = Some(password);
-        let uri          = self.user_uri(&user);
-        let mut request  = self.http.patch(&uri);
-        request.json(&message);
-        self.send_request(request)?;
+    fn save_cookie(&self, response: &reqwest::Response, mut cookie_lock: DotfileLock)
+                   -> Result<()> {
 
-        v2!("Changed password for user {}.", user);
-
-        Ok(())
-    }
-
-    pub fn rm(&self, user: Option<&str>, pats: &[RemotePattern]) -> Result<()> {
-        for rpat in pats {
-            let files = self.fetch_file_list(user, &rpat)?;
-
-            if files.is_empty() {
-                let error = Error::from(ErrorKind::NoSuchRemoteFile(rpat.clone()));
-                ve1!("{}", error);
-                self.had_warning.set(true);
-            }
-
-            for file in files {
-                let uri          = format!("{}{}", self.config.get_endpoint(), file.uri);
-                let request      = self.http.delete(&uri);
-                v2!("Deleting remote file ‘hw{}:{}’...", rpat.hw, file.name);
-                self.send_request(request)?;
+        if let Some(reqwest::header::SetCookie(chunks)) = response.headers().get() {
+            if let Some((key, value)) = parse_cookies(&chunks) {
+                ve3!("< Received cookie {}={}", key, value);
+                cookie_lock.set_cookie(key, value);
             }
         }
 
-        v2!("Done.");
         Ok(())
-    }
-
-    pub fn whoami(&self) -> Result<()> {
-        let username = self.config.get_username();
-
-        if username.is_empty() {
-            return Err(ErrorKind::LoginPlease.into())
-        }
-
-        v1!("{}", username);
-        Ok(())
-    }
-
-    pub fn get_users(&self) -> Result<String> {
-        let uri          = format!("{}/api/users", self.config.get_endpoint());;
-        let request      = self.http.get(&uri);
-        let mut response = self.send_request(request)?;
-        Ok(response.text()?)
     }
 
     fn select_user(&self, username_option: Option<&str>) -> String {
@@ -715,51 +714,10 @@ impl GscClient {
         self.handle_response(&mut response, cookie_lock)?;
         Ok(response)
     }
-
-    fn handle_response(&self,
-                       response: &mut reqwest::Response,
-                       cookie_lock: DotfileLock)
-        -> Result<()> {
-
-        self.save_cookie(response, cookie_lock)?;
-
-        if response.status().is_success() {
-            Ok(())
-        } else {
-            let error = response.json()?;
-            Err(ErrorKind::ServerError(error))?
-        }
-    }
-
-    fn prepare_cookie(&self, request: &mut reqwest::RequestBuilder) -> Result<DotfileLock> {
-        let cookie_lock = self.config.lock_dotfile()?;
-        let cookie      = cookie_lock.get_cookie_header();
-        ve3!("> Sending cookie {}", cookie);
-        request.header(cookie);
-        Ok(cookie_lock)
-    }
-
-    fn save_cookie(&self,
-                   response: &reqwest::Response,
-                   mut cookie_lock: DotfileLock)
-        -> Result<()> {
-
-        if let Some(reqwest::header::SetCookie(chunks)) = response.headers().get() {
-            if let Some((key, value)) = parse_cookies(&chunks) {
-                ve3!("< Received cookie {}={}", key, value);
-                cookie_lock.set_cookie(key, value);
-            }
-        }
-
-        Ok(())
-    }
 }
 
 fn ends_in_slash(path: &Path) -> bool {
-    match path.to_str() {
-        Some(s) => s.ends_with('/'),
-        None    => false,
-    }
+    path.to_str().unwrap_or("").ends_with('/')
 }
 
 fn get_matching_passwords(username: &str) -> Result<String> {
@@ -771,6 +729,34 @@ fn get_matching_passwords(username: &str) -> Result<String> {
     } else {
         Err(errors::ErrorKind::PasswordMismatch)?
     }
+}
+
+fn glob(pattern: &str) -> Result<globset::GlobMatcher> {
+    let real_pattern = if pattern.is_empty() { "*" } else { pattern };
+    Ok(globset::Glob::new(real_pattern)?.compile_matcher())
+}
+
+pub (crate) fn parse_cookie(cookie: &str) -> Option<(String, String)> {
+    let pair = match cookie.find(';') {
+        Some(index) => &cookie[.. index],
+        None        => cookie,
+    };
+
+    pair.find('=').map(|index| {
+        let key   = pair[.. index].to_owned();
+        let value = pair[index + 1 ..].to_owned();
+        (key, value)
+    })
+}
+
+fn parse_cookies(chunks: &[String]) -> Option<(String, String)> {
+    for chunk in chunks {
+        if let Some(pair) = parse_cookie(&chunk) {
+            return Some(pair);
+        }
+    }
+
+    None
 }
 
 fn prompt_password(prompt: &str, username: &str) -> Result<String> {
@@ -801,5 +787,4 @@ impl std::fmt::Display for CpArg {
         }
     }
 }
-
 
