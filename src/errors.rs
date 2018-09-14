@@ -22,6 +22,7 @@ error_chain! {
         Clap(clap::Error);
         Globset(globset::Error);
         Io(std::io::Error);
+        ParseInt(std::num::ParseIntError);
         Reqwest(reqwest::Error);
         SerdeYaml(serde_yaml::Error);
     }

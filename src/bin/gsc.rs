@@ -17,6 +17,7 @@ fn main() {
 
 enum Command {
     AdminExtend{user: String, hw: usize, date: String, eval: bool},
+    AdminSetExam{user: String, exam: usize, num: usize, den: usize},
     AdminSubmissions{hw: usize},
     Auth{user: String},
     Cat{user: Option<String>, rpats: Vec<RemotePattern>},
@@ -45,6 +46,8 @@ fn do_it() -> Result<bool> {
     match command {
         AdminExtend{user, hw, date, eval}
                                      => client.admin_extend(&user, hw, &date, eval),
+        AdminSetExam{user, exam, num, den}
+                                     => client.admin_set_exam(&user, exam, num, den),
         AdminSubmissions{hw}         => client.admin_submissions(hw),
         Auth{user}                   => client.auth(&user),
         Cat{user, rpats}             => client.cat(bs(&user), &rpats),
@@ -94,41 +97,23 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             .subcommand(SubCommand::with_name("auth")
                 .about("Authenticates with the server")
                 .add_common()
-                .arg(Arg::with_name("USER")
-                    .help("Your username (i.e., your NetID)")
-                    .required(true)))
+                .req_arg("USER" ,"Your username (i.e., your NetID)"))
             .subcommand(SubCommand::with_name("cat")
                 .about("Prints remote files to stdout")
                 .add_common()
                 .add_user_opt("The user whose files to print")
-                .arg(Arg::with_name("FILE")
-                    .help("The remote files to print")
-                    .required(true)
-                    .multiple(true)))
+                .req_arg("FILE", "The remote files to print"))
             .subcommand(SubCommand::with_name("cp")
                 .about("Copies files to or from the server")
                 .add_common()
                 .add_user_opt("The user whose files to access")
-                .arg(Arg::with_name("ALL")
-                    .short("a")
-                    .long("all")
-                    .help("Copy all the files in the specified source homework(s)")
-                    .takes_value(false)
-                    .required(false))
-                .arg(Arg::with_name("SRC")
-                    .help("The file(s) to copy")
-                    .required(true)
-                    .multiple(true))
-                .arg(Arg::with_name("DST")
-                    .help("The destination of the file(s)")
-                    .required(true)
-                    .multiple(false)))
+                .flag("ALL", "all", "Copy all the files in the specified source homework(s)")
+                .req_args("SRC", "The file(s) to copy")
+                .req_arg("DST", "The destination of the file(s)"))
             .subcommand(SubCommand::with_name("create")
                 .about("Creates a new account")
                 .add_common()
-                .arg(Arg::with_name("USER")
-                    .help("The new account’s username (i.e., your NetID)")
-                    .required(true)))
+                .req_arg("USER", "The new account’s username (i.e., your NetID)"))
             .subcommand(SubCommand::with_name("deauth")
                 .about("Forgets authentication credentials")
                 .add_common())
@@ -136,9 +121,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 .about("Lists files")
                 .add_common()
                 .add_user_opt("The user whose homework to list")
-                .arg(Arg::with_name("SPEC")
-                    .help("The homework or file(s) to list, e.g. ‘hw3’")
-                    .required(true)))
+                .req_arg("SPEC", "The homework or file(s) to list, e.g. ‘hw3’"))
             .subcommand(SubCommand::with_name("partner")
                 .about("Manages partners")
                 .add_common()
@@ -160,23 +143,13 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 .about("Removes remote files")
                 .add_common()
                 .add_user_opt("The user whose files to remove")
-                .arg(Arg::with_name("ALL")
-                    .short("a")
-                    .long("all")
-                    .help("Remove all the files in the specified homework")
-                    .takes_value(false)
-                    .required(false))
-                .arg(Arg::with_name("FILE")
-                    .help("The remote files to remove")
-                    .required(true)
-                    .multiple(true)))
+                .flag("ALL", "all", "Remove all the files in the specified homework")
+                .req_args("FILE", "The remote files to remove"))
             .subcommand(SubCommand::with_name("status")
                 .about("Retrieves user or submission status")
                 .add_common()
                 .add_user_opt("The user whose status check")
-                .arg(Arg::with_name("HW")
-                    .help("The homework to lookup, e.g. ‘hw3’")
-                    .required(false)))
+                .opt_arg("HW", "The homework to lookup, e.g. ‘hw3’"))
             .subcommand(SubCommand::with_name("whoami")
                 .about("Prints your username, if authenticated")
                 .add_common()))
@@ -190,14 +163,21 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             process_common(submatches, config);
 
             if let Some(subsubmatches) = submatches.subcommand_matches("extend") {
-                process_common(submatches, config);
+                process_common(subsubmatches, config);
                 let eval = subsubmatches.is_present("EVAL");
                 let hw   = parse_hw(subsubmatches.value_of("HW").unwrap())?;
                 let user = subsubmatches.value_of("USER").unwrap().to_owned();
                 let date = subsubmatches.value_of("DATESPEC").unwrap().to_owned();
                 Ok(Command::AdminExtend { hw, user, date, eval })
+            } else if let Some(subsubmatches) = submatches.subcommand_matches("set_exam") {
+                process_common(subsubmatches, config);
+                let exam = subsubmatches.value_of("EXAM").unwrap().parse()?;
+                let user = subsubmatches.value_of("USER").unwrap().to_owned();
+                let num  = subsubmatches.value_of("POINTS").unwrap().parse()?;
+                let den  = subsubmatches.value_of("POSSIBLE").unwrap().parse()?;
+                Ok(Command::AdminSetExam { user, exam, num, den })
             } else if let Some(subsubmatches) = submatches.subcommand_matches("submissions") {
-                process_common(submatches, config);
+                process_common(subsubmatches, config);
                 let hw   = parse_hw(subsubmatches.value_of("HW").unwrap())?;
                 Ok(Command::AdminSubmissions{hw})
             } else {
@@ -328,6 +308,15 @@ trait AppExt {
     fn add_common(self) -> Self;
     fn add_partner_args(self) -> Self;
     fn add_user_opt(self, about: &'static str) -> Self;
+
+    // An optional positional argument:
+    fn opt_arg(self, name: &'static str, help: &'static str) -> Self;
+    // A required positional argument:
+    fn req_arg(self, name: &'static str, help: &'static str) -> Self;
+    // A required, multiple positional argument:
+    fn req_args(self, name: &'static str, help: &'static str) -> Self;
+    // An optional flag:
+    fn flag(self, name: &'static str, flag: &'static str, help: &'static str) -> Self;
 }
 
 impl<'a, 'b> AppExt for clap::App<'a, 'b> {
@@ -341,30 +330,21 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
             .subcommand(SubCommand::with_name("extend")
                 .about("Extends a due date")
                 .add_common()
-                .arg(Arg::with_name("EVAL")
-                    .short("e")
-                    .long("eval")
-                    .takes_value(false)
-                    .help("Extends self eval instead of file  submission"))
-                .arg(Arg::with_name("HW")
-                    .takes_value(true)
-                    .required(true)
-                    .help("The homework to extend"))
-                .arg(Arg::with_name("USER")
-                    .takes_value(true)
-                    .required(true)
-                    .help("The user to extend"))
-                .arg(Arg::with_name("DATESPEC")
-                    .takes_value(true)
-                    .required(true)
-                    .help("The new due date")))
+                .flag("EVAL", "eval", "Extends self eval instead of file submission")
+                .req_arg("HW", "The homework to extend")
+                .req_arg("USER", "The user to extend")
+                .req_arg("DATESPEC", "The new due date"))
+            .subcommand(SubCommand::with_name("set_exam")
+                .about("Sets the grade for an exam")
+                .add_common()
+                .req_arg("EXAM", "The exam number whose grade to set")
+                .req_arg("USER", "The user whose grade to set")
+                .req_arg("POINTS", "The points scored")
+                .req_arg("POSSIBLE", "The points possible"))
             .subcommand(SubCommand::with_name("submissions")
                 .about("Lists submissions for a given assignment")
                 .add_common()
-                .arg(Arg::with_name("HW")
-                    .takes_value(true)
-                    .required(true)
-                    .help("The assignment to query"))))
+                .req_arg("HW", "The assignment to query")))
     }
 
     #[cfg(not(feature = "admin"))]
@@ -373,16 +353,13 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
     }
 
     fn add_common(self) -> Self {
-        use clap::*;
-
-        self
-            .arg(Arg::with_name("VERBOSE")
+        self.arg(clap::Arg::with_name("VERBOSE")
                 .short("v")
                 .long("verbose")
                 .multiple(true)
                 .takes_value(false)
                 .help("Makes the output more verbose"))
-            .arg(Arg::with_name("QUIET")
+            .arg(clap::Arg::with_name("QUIET")
                 .short("q")
                 .long("quiet")
                 .multiple(true)
@@ -391,23 +368,15 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
     }
 
     fn add_partner_args(self) -> Self {
-        use clap::*;
-        self.arg(Arg::with_name("HW")
-                .help("The homework of the partner request")
-                .takes_value(true)
-                .required(true))
-            .arg(Arg::with_name("USER")
-                .help("The other user of the partner request")
-                .takes_value(true)
-                .required(true))
+        self.req_arg("HW", "The homework of the partner request")
+            .req_arg("USER", "The other user of the partner request")
     }
 
     #[cfg(feature = "admin")]
     fn add_user_opt(self, about: &'static str) -> Self {
-        use clap::*;
-        self.arg(Arg::with_name("ME")
-            .short("u")
+        self.arg(clap::Arg::with_name("ME")
             .long("user")
+            .short("u")
             .help(about)
             .takes_value(true)
             .required(false))
@@ -416,6 +385,37 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
     #[cfg(not(feature = "admin"))]
     fn add_user_opt(self, _about: &'static str) -> Self {
         self
+    }
+
+    fn opt_arg(self, name: &'static str, help: &'static str) -> Self {
+        self.arg(clap::Arg::with_name(name)
+            .takes_value(true)
+            .required(false)
+            .help(help))
+    }
+
+    fn req_arg(self, name: &'static str, help: &'static str) -> Self {
+        self.arg(clap::Arg::with_name(name)
+            .takes_value(true)
+            .required(true)
+            .help(help))
+    }
+
+    fn req_args(self, name: &'static str, help: &'static str) -> Self {
+        self.arg(clap::Arg::with_name(name)
+            .takes_value(true)
+            .multiple(true)
+            .required(true)
+            .help(help))
+    }
+
+    fn flag(self, name: &'static str, long: &'static str, help: &'static str) -> Self {
+        self.arg(clap::Arg::with_name(name)
+            .long(long)
+            .short(&long[..1])
+            .help(help)
+            .takes_value(false)
+            .required(false))
     }
 }
 

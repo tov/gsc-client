@@ -66,6 +66,26 @@ impl GscClient {
         Ok(())
     }
 
+    pub fn admin_set_exam(&self,
+                          username: &str,
+                          number: usize,
+                          points: usize,
+                          possible: usize) -> Result<()> {
+
+        let uri         = self.user_uri(username);
+        let mut message = messages::UserChange::default();
+        message.exam_grades = vec![
+            messages::ExamGrade { number, points, possible, }
+        ];
+        let mut request = self.http.patch(&uri);
+        request.json(&message);
+        self.send_request(request)?;
+
+        v2!("Set exam {} grade for {} to {} / {}", number, username, points, possible);
+
+        Ok(())
+    }
+
     pub fn admin_submissions(&self, hw: usize) -> Result<()> {
 
         let uri        = format!("{}/api/submissions/hw{}", self.config.get_endpoint(), hw);
