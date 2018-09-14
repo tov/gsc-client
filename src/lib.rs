@@ -372,7 +372,12 @@ impl GscClient {
         Ok(())
     }
 
-    pub fn status(&mut self, user: Option<&str>, number: usize) -> Result<()>
+    pub fn status_user(&mut self, _user: Option<&str>) -> Result<()> {
+
+        Ok(())
+    }
+
+    pub fn status_hw(&mut self, user: Option<&str>, number: usize) -> Result<()>
     {
         let uri          = self.get_uri_for_submission(user, number)?;
         let request      = self.http.get(&uri);
@@ -504,7 +509,7 @@ impl GscClient {
         Ok(())
     }
 
-    pub fn get_users(&mut self) -> Result<String> {
+    pub fn get_users(&self) -> Result<String> {
         let uri          = format!("{}/api/users", self.config.get_endpoint());;
         let request      = self.http.get(&uri);
         let mut response = self.send_request(request)?;
@@ -518,7 +523,7 @@ impl GscClient {
         }.to_owned()
     }
 
-    fn send_request(&mut self, mut req_builder: reqwest::RequestBuilder)
+    fn send_request(&self, mut req_builder: reqwest::RequestBuilder)
         -> Result<reqwest::Response> {
 
         let cookie_lock = self.prepare_cookie(&mut req_builder)?;
@@ -529,7 +534,7 @@ impl GscClient {
         Ok(response)
     }
 
-    fn handle_response(&mut self,
+    fn handle_response(&self,
                        response: &mut reqwest::Response,
                        cookie_lock: DotfileLock)
         -> Result<()> {
@@ -544,7 +549,7 @@ impl GscClient {
         }
     }
 
-    fn prepare_cookie(&mut self, request: &mut reqwest::RequestBuilder) -> Result<DotfileLock> {
+    fn prepare_cookie(&self, request: &mut reqwest::RequestBuilder) -> Result<DotfileLock> {
         let cookie_lock = self.config.lock_dotfile()?;
         let cookie      = cookie_lock.get_cookie_header();
         ve3!("> Sending cookie {}", cookie);
@@ -552,7 +557,7 @@ impl GscClient {
         Ok(cookie_lock)
     }
 
-    fn save_cookie(&mut self,
+    fn save_cookie(&self,
                    response: &reqwest::Response,
                    mut cookie_lock: DotfileLock)
         -> Result<()> {

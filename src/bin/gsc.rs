@@ -43,7 +43,7 @@ fn do_it() -> Result<bool> {
         Command::Ls{user, rpat}         => client.ls(bs(&user), &rpat),
         Command::Passwd{user}           => client.passwd(bs(&user)),
         Command::Rm{user, rpats}        => client.rm(bs(&user), &rpats),
-        Command::Status{user, hw}       => client.status(bs(&user), hw),
+        Command::Status{user, hw}       => client.status_hw(bs(&user), hw),
         Command::Whoami                 => client.whoami(),
     }?;
 

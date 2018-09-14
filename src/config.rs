@@ -55,7 +55,7 @@ impl Config {
         self.username = username;
     }
 
-    fn new_dotfile_lock(&mut self, dotfile: Dotfile, key: String, value: String)
+    fn new_dotfile_lock(&self, dotfile: Dotfile, key: String, value: String)
                         -> Result<DotfileLock> {
 
         let file = std::fs::OpenOptions::new()
@@ -73,14 +73,14 @@ impl Config {
         })
     }
 
-    pub fn new_cookie(&mut self) -> Result<DotfileLock> {
+    pub fn new_cookie(&self) -> Result<DotfileLock> {
         let mut dotfile = self.read_dotfile()?;
         dotfile.username = self.username.clone();
         dotfile.endpoint = self.endpoint.clone();
         self.new_dotfile_lock(dotfile, String::new(), String::new())
     }
 
-    pub fn lock_dotfile(&mut self) -> Result<DotfileLock> {
+    pub fn lock_dotfile(&self) -> Result<DotfileLock> {
         let dotfile = self.read_dotfile()?;
         let (key, value) = super::parse_cookie(&dotfile.cookie)
             .ok_or(ErrorKind::LoginPlease)?;
