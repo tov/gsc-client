@@ -101,7 +101,7 @@ impl GscClient {
         let mut result = self.send_request(request)?;
         let submissions: Vec<messages::SubmissionShort> = result.json()?;
 
-        let mut table = table::TextTable::new("%r  %l  %l\n");
+        let mut table = table::TextTable::new(" %r  %l  %l\n");
 
         for submission in &submissions {
             table.add_row(table::Row::new()
