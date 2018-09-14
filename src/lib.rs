@@ -2,10 +2,10 @@
 
 use vlog::*;
 use percent_encoding::{utf8_percent_encode, PATH_SEGMENT_ENCODE_SET};
+use std::cell::{Cell, RefCell};
 use std::collections::{hash_map, HashMap};
 use std::io;
 use std::path::{Path, PathBuf};
-use std::cell::{Cell, RefCell};
 
 pub mod config;
 pub mod errors;
