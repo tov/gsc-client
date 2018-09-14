@@ -401,7 +401,7 @@ impl GscClient {
         }
 
         if !user.exam_grades.is_empty() {
-            let mut table = table::TextTable::new("    Exam %l: %r%%    (%l / %l)\n");
+            let mut table = table::TextTable::new("    ex%l: %r%%    (%l / %l)\n");
 
             for e in &user.exam_grades {
                 let grade = format!("{:.1}", 100.0 * e.points as f64 / e.possible as f64);
