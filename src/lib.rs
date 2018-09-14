@@ -818,12 +818,3 @@ impl std::fmt::Display for RemotePattern {
     }
 }
 
-impl std::fmt::Display for CpArg {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            CpArg::Local(filename) => write!(f, ":{}", filename.display()),
-            CpArg::Remote(rp)      => write!(f, "{}", rp),
-        }
-    }
-}
-
