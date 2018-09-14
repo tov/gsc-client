@@ -540,15 +540,21 @@ impl GscClient {
     }
 
     pub fn partner_request(&self, me_opt: Option<&str>, hw: usize, them: &str) -> Result<()> {
-        self.partner_operation(messages::PartnerRequestStatus::Outgoing, me_opt, hw, them)
+        self.partner_operation(messages::PartnerRequestStatus::Outgoing, me_opt, hw, them)?;
+        v2!("Request sent.");
+        Ok(())
     }
 
     pub fn partner_accept(&self, me_opt: Option<&str>, hw: usize, them: &str)-> Result<()> {
-        self.partner_operation(messages::PartnerRequestStatus::Accepted, me_opt, hw, them)
+        self.partner_operation(messages::PartnerRequestStatus::Accepted, me_opt, hw, them)?;
+        v2!("Request accepted.");
+        Ok(())
     }
 
     pub fn partner_cancel(&self, me_opt: Option<&str>, hw: usize, them: &str)-> Result<()> {
-        self.partner_operation(messages::PartnerRequestStatus::Canceled, me_opt, hw, them)
+        self.partner_operation(messages::PartnerRequestStatus::Canceled, me_opt, hw, them)?;
+        v2!("Request canceled.");
+        Ok(())
     }
 
     pub fn partner_operation(&self,
@@ -568,9 +574,6 @@ impl GscClient {
                 status:             op,
             }
         ]);
-
-        let s = serde_json::to_string(&message).unwrap();
-        ve0!("{}", s);
 
         let mut request = self.http.patch(&uri);
         request.json(&message);
