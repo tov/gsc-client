@@ -35,6 +35,7 @@ pub struct FileMeta {
 pub enum JsonResult {
     Success(String),
     Failure(String),
+    Nested(Vec<JsonResult>),
 }
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]

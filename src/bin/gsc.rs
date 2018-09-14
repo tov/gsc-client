@@ -1,6 +1,8 @@
 use gsc_client::*;
-use gsc_client::errors::{Result, ErrorKind, syntax_error};
+use gsc_client::errors::{Result, ResultExt, ErrorKind, syntax_error};
+use std::error::Error;
 use std::process::exit;
+use std::str::FromStr;
 
 fn main() {
     vlog::set_verbosity_level(1);
@@ -8,6 +10,14 @@ fn main() {
     match do_it() {
         Err(err)  => {
             eprintln!("{}", err);
+
+            let mut cause = err.cause();
+
+            while let Some(error) = cause {
+                eprintln!("Cause: {}", error);
+                cause = error.cause();
+            }
+
             exit(1);
         }
         Ok(true)  => exit(2),
@@ -178,10 +188,10 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 Ok(Command::AdminExtend { hw, user, date, eval })
             } else if let Some(subsubmatches) = submatches.subcommand_matches("set_exam") {
                 process_common(subsubmatches, config);
-                let exam = subsubmatches.value_of("EXAM").unwrap().parse()?;
+                let exam = subsubmatches.value_of("EXAM").unwrap().parse_descr("exam number")?;
                 let user = subsubmatches.value_of("USER").unwrap().to_owned();
-                let num  = subsubmatches.value_of("POINTS").unwrap().parse()?;
-                let den  = subsubmatches.value_of("POSSIBLE").unwrap().parse()?;
+                let num  = subsubmatches.value_of("POINTS").unwrap().parse_descr("points scored")?;
+                let den  = subsubmatches.value_of("POSSIBLE").unwrap().parse_descr("points possible")?;
                 Ok(Command::AdminSetExam { user, exam, num, den })
             } else if let Some(subsubmatches) = submatches.subcommand_matches("submissions") {
                 process_common(subsubmatches, config);
@@ -451,13 +461,26 @@ mod re {
     }
 }
 
+trait ParseWithDescription {
+    fn parse_descr<F: FromStr>(&self, descr: &str) -> Result<F>
+        where <F as FromStr>::Err: std::error::Error + Send + 'static;
+}
+
+impl ParseWithDescription for str {
+    fn parse_descr<F: FromStr>(&self, descr: &str) -> Result<F>
+        where <F as FromStr>::Err: std::error::Error + Send + 'static
+    {
+        self.parse().chain_err(|| syntax_error(descr, self))
+    }
+}
+
 fn parse_hw(spec: &str) -> Result<usize> {
     if let Some(i) = re::HW_ONLY.captures(spec)
         .and_then(|captures| captures.get(1))
         .and_then(|s| s.as_str().parse().ok()) {
         Ok(i)
     } else {
-        Err(syntax_error("homework spec", spec))
+        Err(syntax_error("homework spec", spec))?
     }
 }
 

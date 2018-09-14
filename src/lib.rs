@@ -86,11 +86,8 @@ impl GscClient {
         ];
         let mut request = self.http.patch(&uri);
         request.json(&message);
-        self.send_request(request)?;
-
-        v2!("Set exam {} grade for {} to {} / {}", number, username, points, possible);
-
-        Ok(())
+        let response    = self.send_request(request)?;
+        self.print_results(response)
     }
 
     pub fn admin_submissions(&self, hw: usize) -> Result<()> {
@@ -408,21 +405,15 @@ impl GscClient {
     }
 
     pub fn partner_request(&self, me_opt: Option<&str>, hw: usize, them: &str) -> Result<()> {
-        self.partner_operation(messages::PartnerRequestStatus::Outgoing, me_opt, hw, them)?;
-        v2!("Request sent.");
-        Ok(())
+        self.partner_operation(messages::PartnerRequestStatus::Outgoing, me_opt, hw, them)
     }
 
     pub fn partner_accept(&self, me_opt: Option<&str>, hw: usize, them: &str)-> Result<()> {
-        self.partner_operation(messages::PartnerRequestStatus::Accepted, me_opt, hw, them)?;
-        v2!("Request accepted.");
-        Ok(())
+        self.partner_operation(messages::PartnerRequestStatus::Accepted, me_opt, hw, them)
     }
 
     pub fn partner_cancel(&self, me_opt: Option<&str>, hw: usize, them: &str)-> Result<()> {
-        self.partner_operation(messages::PartnerRequestStatus::Canceled, me_opt, hw, them)?;
-        v2!("Request canceled.");
-        Ok(())
+        self.partner_operation(messages::PartnerRequestStatus::Canceled, me_opt, hw, them)
     }
 
     fn partner_operation(&self,
@@ -609,14 +600,12 @@ impl GscClient {
             .collect())
     }
 
-    fn fetch_submissions(&self, user: &str)
-                         -> Result<Vec<messages::SubmissionShort>> {
-
+    fn fetch_submissions(&self, user: &str) -> Result<Vec<messages::SubmissionShort>> {
         let uri          = self.user_uri(user) + "/submissions";
         let request      = self.http.get(&uri);
         let mut response = self.send_request(request)?;
         response.json()
-            .map_err(|e| Error::with_chain(e, "Could not understand response from server"))
+            .chain_err(|| "Could not understand response from server")
     }
 
     fn get_submission_uris(&self, user: &str) -> Result<Vec<Option<String>>> {
@@ -705,7 +694,11 @@ impl GscClient {
 
     fn print_results(&self, mut response: reqwest::Response) -> Result<()> {
         let results: Vec<messages::JsonResult> = response.json()?;
+        self.print_results_helper(&results);
+        Ok(())
+    }
 
+    fn print_results_helper(&self, results: &[messages::JsonResult]) {
         for result in results {
             match result {
                 messages::JsonResult::Success(msg) => {
@@ -715,10 +708,11 @@ impl GscClient {
                     ve1!("{}", msg);
                     self.had_warning.set(true);
                 }
+                messages::JsonResult::Nested(vec) => {
+                    self.print_results_helper(&vec);
+                }
             }
         }
-
-        Ok(())
     }
 
     fn user_uri(&self, user: &str) -> String {

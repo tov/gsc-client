@@ -42,7 +42,7 @@ error_chain! {
 
         SyntaxError(class: String, thing: String) {
             description("syntax error")
-            display("Syntax error: Could not parse ‘{}’ as {}.", thing, class)
+            display("Syntax error: could not parse ‘{}’ as {}.", thing, class)
         }
 
         PasswordMismatch {
@@ -109,8 +109,8 @@ error_chain! {
     }
 }
 
-pub fn syntax_error<S1: Into<String>, S2: Into<String>>(class: S1, thing: S2) -> Error {
-    ErrorKind::SyntaxError(class.into(), thing.into()).into()
+pub fn syntax_error<S1: Into<String>, S2: Into<String>>(class: S1, thing: S2) -> ErrorKind {
+    ErrorKind::SyntaxError(class.into(), thing.into())
 }
 
 pub fn dest_pat_is_multiple(rpat: &RemotePattern,
