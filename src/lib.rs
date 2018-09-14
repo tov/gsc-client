@@ -263,14 +263,14 @@ impl GscClient {
         if dst.pat.is_empty() {
             for src in srcs {
                 let filename     = match self.get_base_filename(&src) {
-                    Ok(s)  => s.to_owned(),
+                    Ok(s)  => s,
                     Err(e) => {
                         ve1!("{}", e);
                         self.had_warning.set(true);
                         continue;
                     }
                 };
-                self.upload_file(src, &RemotePattern { hw: dst.hw, pat: filename })?;
+                self.upload_file(src, &dst.with_pat(filename))?;
             }
         } else {
             let src = if srcs.len() == 1 {
@@ -279,14 +279,14 @@ impl GscClient {
                 Err(ErrorKind::MultipleSourcesOneDestination(dst.to_string()))?
             };
 
-            let dsts = self.fetch_file_list(dst)?;
-            let dst_filename = match dsts.len() {
-                0 => dst.pat.to_owned(),
-                1 => dsts[0].name.to_owned(),
+            let dsts     = self.fetch_file_list(dst)?;
+            let filename = match dsts.len() {
+                0 => &dst.pat,
+                1 => &dsts[0].name,
                 _ => Err(dest_pat_is_multiple(dst, &dsts))?,
             };
 
-            self.upload_file(src, &RemotePattern { hw: dst.hw, pat: dst_filename })?;
+            self.upload_file(src, &dst.with_pat(filename))?;
         }
 
         v2!("Done.");
@@ -796,6 +796,10 @@ fn soft_create_dir(path: &Path) -> Result<()> {
 impl RemotePattern {
     pub fn is_whole_hw(&self) -> bool {
         self.pat.is_empty()
+    }
+
+    pub fn with_pat(&self, pat: &str) -> Self {
+        RemotePattern { hw: self.hw, pat: pat.to_owned(), }
     }
 }
 
