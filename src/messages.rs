@@ -30,6 +30,13 @@ pub struct FileMeta {
     pub uri:                String,
 }
 
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum JsonResult {
+    Success(String),
+    Failure(String),
+}
+
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum PartnerRequestStatus {

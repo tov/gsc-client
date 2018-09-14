@@ -53,11 +53,8 @@ impl GscClient {
         message.owner2  = Some(());
         let mut request = self.http.patch(&uri);
         request.json(&message);
-        self.send_request(request)?;
-
-        v2!("Divorced.");
-
-        Ok(())
+        let response    = self.send_request(request)?;
+        self.print_results(response)
     }
 
     pub fn admin_extend(&self, username: &str, hw: usize, datetime: &str, eval: bool)
@@ -68,15 +65,12 @@ impl GscClient {
         if eval {
             message.eval_date = Some(datetime.to_owned());
         } else {
-            message.due_date = Some(datetime.to_owned());
+            message.due_date  = Some(datetime.to_owned());
         }
         let mut request  = self.http.patch(&uri);
         request.json(&message);
-        self.send_request(request)?;
-
-        v2!("Extended.");
-
-        Ok(())
+        let response     = self.send_request(request)?;
+        self.print_results(response)
     }
 
     pub fn admin_set_exam(&self,
@@ -451,9 +445,8 @@ impl GscClient {
 
         let mut request = self.http.patch(&uri);
         request.json(&message);
-        self.send_request(request)?;
-
-        Ok(())
+        let response    = self.send_request(request)?;
+        self.print_results(response)
     }
 
     pub fn passwd(&self, user_option: Option<&str>) -> Result<()> {
@@ -464,11 +457,8 @@ impl GscClient {
         let uri          = self.user_uri(&user);
         let mut request  = self.http.patch(&uri);
         request.json(&message);
-        self.send_request(request)?;
-
-        v2!("Changed password for user {}.", user);
-
-        Ok(())
+        let response     = self.send_request(request)?;
+        self.print_results(response)
     }
 
     pub fn rm(&self, user: Option<&str>, pats: &[RemotePattern]) -> Result<()> {
@@ -711,6 +701,24 @@ impl GscClient {
 
             v1!("{}Partner requests:\n{}", indent, table);
         }
+    }
+
+    fn print_results(&self, mut response: reqwest::Response) -> Result<()> {
+        let results: Vec<messages::JsonResult> = response.json()?;
+
+        for result in results {
+            match result {
+                messages::JsonResult::Success(msg) => {
+                    v2!("{}", msg);
+                }
+                messages::JsonResult::Failure(msg) => {
+                    ve1!("{}", msg);
+                    self.had_warning.set(true);
+                }
+            }
+        }
+
+        Ok(())
     }
 
     fn user_uri(&self, user: &str) -> String {
