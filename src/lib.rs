@@ -47,6 +47,19 @@ impl GscClient {
         self.had_warning.get()
     }
 
+    pub fn admin_divorce(&self, username: &str, hw: usize) -> Result<()> {
+        let uri         = self.get_uri_for_submission(Some(username), hw)?;
+        let mut message = messages::SubmissionChange::default();
+        message.owner2  = Some(());
+        let mut request = self.http.patch(&uri);
+        request.json(&message);
+        self.send_request(request)?;
+
+        v2!("Divorced.");
+
+        Ok(())
+    }
+
     pub fn admin_extend(&self, username: &str, hw: usize, datetime: &str, eval: bool)
         -> Result<()> {
 

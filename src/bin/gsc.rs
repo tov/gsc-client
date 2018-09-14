@@ -16,6 +16,7 @@ fn main() {
 }
 
 enum Command {
+    AdminDivorce{user: String, hw: usize},
     AdminExtend{user: String, hw: usize, date: String, eval: bool},
     AdminSetExam{user: String, exam: usize, num: usize, den: usize},
     AdminSubmissions{hw: usize},
@@ -44,6 +45,7 @@ fn do_it() -> Result<bool> {
     use self::Command::*;
 
     match command {
+        AdminDivorce{user, hw}       => client.admin_divorce(&user, hw),
         AdminExtend{user, hw, date, eval}
                                      => client.admin_extend(&user, hw, &date, eval),
         AdminSetExam{user, exam, num, den}
@@ -162,7 +164,12 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
         if let Some(submatches) = matches.subcommand_matches("admin") {
             process_common(submatches, config);
 
-            if let Some(subsubmatches) = submatches.subcommand_matches("extend") {
+            if let Some(subsubmatches) = submatches.subcommand_matches("divorce") {
+                process_common(subsubmatches, config);
+                let hw   = parse_hw(subsubmatches.value_of("HW").unwrap())?;
+                let user = subsubmatches.value_of("USER").unwrap().to_owned();
+                Ok(Command::AdminDivorce { user, hw })
+            } else if let Some(subsubmatches) = submatches.subcommand_matches("extend") {
                 process_common(subsubmatches, config);
                 let eval = subsubmatches.is_present("EVAL");
                 let hw   = parse_hw(subsubmatches.value_of("HW").unwrap())?;
@@ -332,6 +339,11 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
         self.subcommand(SubCommand::with_name("admin")
             .about("Administrative commands")
             .add_common()
+            .subcommand(SubCommand::with_name("divorce")
+                .about("Ends a partnership")
+                .add_common()
+                .req_arg("HW", "The homework in question")
+                .req_arg("USER", "One of the two partners"))
             .subcommand(SubCommand::with_name("extend")
                 .about("Extends a due date")
                 .add_common()

@@ -138,6 +138,8 @@ pub struct SubmissionChange {
     pub eval_date:          Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bytes_quota:        Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner2:             Option<()>,
 }
 
 impl std::fmt::Display for DateTime {
@@ -204,6 +206,7 @@ impl Default for SubmissionChange {
             due_date:       None,
             eval_date:      None,
             bytes_quota:    None,
+            owner2:         None,
         }
     }
 }
