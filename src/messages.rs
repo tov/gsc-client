@@ -66,13 +66,15 @@ pub enum UserRole {
 pub struct UserShort {
     pub name:               String,
     pub uri:                String,
+    pub submissions_uri:    String,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct User {
     pub name:               String,
-    pub role:               UserRole,
     pub uri:                String,
+    pub submissions_uri:    String,
+    pub role:               UserRole,
     pub exam_grades:        Vec<ExamGrade>,
     pub partner_requests:   Vec<PartnerRequest>,
     pub submissions:        Vec<SubmissionShort>,
