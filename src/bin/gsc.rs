@@ -258,24 +258,21 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
         else if let Some(submatches) = matches.subcommand_matches("partner") {
             process_common(submatches, config);
 
-            let process_partner =
-                |matches: &clap::ArgMatches, config: &mut config::Config|
-                    -> Result<(usize, String)>
-                {
-                    process_common(matches, config);
-                    let hw   = matches.value_of("HW").unwrap();
-                    let them = matches.value_of("USER").unwrap();
-                    Ok((parse_hw(hw)?, them.to_owned()))
-                };
+            let mut process_partner = |matches: &clap::ArgMatches| -> Result<_> {
+                process_common(matches, config);
+                let hw   = matches.value_of("HW").unwrap();
+                let them = matches.value_of("USER").unwrap();
+                Ok((parse_hw(hw)?, them.to_owned()))
+            };
 
             if let Some(subsubmatches) = submatches.subcommand_matches("request") {
-                let (hw, them) = process_partner(subsubmatches, config)?;
+                let (hw, them) = process_partner(subsubmatches)?;
                 Ok(Command::PartnerRequest{hw, them})
             } else if let Some(subsubmatches) = submatches.subcommand_matches("accept") {
-                let (hw, them) = process_partner(subsubmatches, config)?;
+                let (hw, them) = process_partner(subsubmatches)?;
                 Ok(Command::PartnerAccept{hw, them})
             } else if let Some(subsubmatches) = submatches.subcommand_matches("cancel") {
-                let (hw, them) = process_partner(subsubmatches, config)?;
+                let (hw, them) = process_partner(subsubmatches)?;
                 Ok(Command::PartnerCancel{hw, them})
             } else {
                 Ok(Command::Partner)
