@@ -121,6 +121,7 @@ impl GscClient {
 
         loop {
             let password = prompt_password("Password", username)?;
+            ve3!("> Sending request to {}", uri);
             let mut response = self.http.get(&uri)
                 .basic_auth(username, Some(password))
                 .send()?;
