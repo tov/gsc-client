@@ -169,7 +169,7 @@ impl GscClient {
                     v2!("Authenticated as {}", username);
                     return Ok(());
                 }
-                Err(e @ Error(ErrorKind::ServerError(JsonError { status: 401, .. }), _)) =>
+                Err(e @ Error(ErrorKind::ServerError(JsonStatus { status: 401, .. }), _)) =>
                     eprintln!("{}", e),
                 e =>
                     e?,
@@ -363,10 +363,16 @@ impl GscClient {
         let uri          = format!("{}/api/whoami", self.config.get_endpoint());
         let request      = self.http.delete(&uri);
         let result       = match self.send_request(request) {
-            Ok(mut response) => match response.json() {
-                Ok(true)  => Ok("Deauthenticated with server."),
-                Ok(false) => Err(format!("Could not deauthenticate with server.")),
-                Err(e)    => Err(format!("Could not understand JSON from server:\n  {}", e)),
+            Ok(mut response) => {
+                let result: reqwest::Result<errors::JsonStatus> = response.json();
+                match result {
+                    Ok(e)   => if e.status == 200 {
+                        Ok("Deauthenticated with server.")
+                    } else {
+                        Err(format!("Could not deauthenticate with server."))
+                    },
+                    Err(e)  => Err(format!("Could not understand JSON from server:\n  {}", e)),
+                }
             }
 
             Err(e)    => match e.kind() {

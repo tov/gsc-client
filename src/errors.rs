@@ -8,7 +8,7 @@ use std::path::PathBuf;
 /// This is the format of error messages produced by the server.
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct JsonError {
+pub struct JsonStatus {
     pub status:  u16,
     pub title:   String,
     pub message: String,
@@ -28,7 +28,7 @@ error_chain! {
     }
 
     errors {
-        ServerError(contents: JsonError) {
+        ServerError(contents: JsonStatus) {
             description("error from server")
             display("Error response from server:\n  {} {}\n  {}",
                     contents.status, contents.title,
