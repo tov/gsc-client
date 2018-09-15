@@ -251,8 +251,8 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
         else if let Some(submatches) = matches.subcommand_matches("ls") {
             process_common(submatches, config);
             let ls_spec   = submatches.value_of("SPEC").unwrap();
-            let (hw, pat) = parse_hw_opt_file(ls_spec)?;
-            Ok(Command::Ls{rpat: RemotePattern{hw, pat}})
+            let rpat      = parse_hw_opt_file(ls_spec)?;
+            Ok(Command::Ls{rpat})
         }
 
         else if let Some(submatches) = matches.subcommand_matches("partner") {
@@ -480,14 +480,14 @@ fn parse_hw(spec: &str) -> Result<usize> {
     }
 }
 
-fn parse_hw_opt_file(spec: &str) -> Result<(usize, String)> {
+fn parse_hw_opt_file(spec: &str) -> Result<RemotePattern> {
     let captures  = re::HW_OPT_FILE.captures(spec)
         .ok_or_else(|| syntax_error("homework or file spec", spec))?;
     let capture1  = captures.get(1).unwrap().as_str();
     let capture2  = captures.get(2).map(|c| c.as_str());
-    let hw_number = capture1.parse().unwrap();
-    let pattern   = capture2.unwrap_or("").to_owned();
-    Ok((hw_number, pattern))
+    let hw        = capture1.parse().unwrap();
+    let pat       = capture2.unwrap_or("").to_owned();
+    Ok(RemotePattern{hw, pat})
 }
 
 fn parse_hw_file(file_spec: &str) -> Result<RemotePattern> {
