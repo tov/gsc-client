@@ -66,7 +66,6 @@ pub enum UserRole {
 pub struct UserShort {
     pub name:               String,
     pub uri:                String,
-    pub submissions_uri:    String,
 }
 
 #[derive(Deserialize, Debug)]
