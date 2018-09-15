@@ -3,6 +3,46 @@ use serde_derive::{Serialize, Deserialize};
 #[derive(Clone, Deserialize, Debug)]
 pub struct DateTime(chrono::DateTime<chrono::offset::FixedOffset>);
 
+#[derive(Clone, Deserialize, Debug)]
+pub struct EvalShort {
+    pub uri:            String,
+    pub sequence:       usize,
+    pub submission_uri: String,
+}
+
+#[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum EvalType {
+    Boolean,
+    Scale,
+    Informational,
+}
+#[derive(Deserialize, Debug)]
+pub struct ShortEval {
+    pub uri:            String,
+    pub sequence:       usize,
+    pub submission_uri: String,
+    #[serde(rename = "type")]
+    pub eval_type:      EvalType,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Eval {
+    pub uri:            String,
+    pub sequence:       usize,
+    pub submission_uri: String,
+    #[serde(rename = "type")]
+    pub eval_type:      EvalType,
+    pub prompt:         String,
+    pub value:          f64,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub self_eval:      Option<SelfEval>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grader_eval:    Option<GraderEval>,
+}
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct ExamGrade {
     pub number:             usize,
@@ -18,6 +58,23 @@ pub enum FilePurpose {
     Config,
     Resource,
     Log,
+}
+
+#[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum GraderEvalStatus {
+    Editing,
+    HeldBack,
+    Ready,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct GraderEval {
+    pub uri:            String,
+    pub grader:         String,
+    pub score:          f64,
+    pub explanation:    String,
+    pub status:         GraderEvalStatus,
 }
 
 #[derive(Deserialize, Debug)]
@@ -77,6 +134,13 @@ pub struct User {
     pub exam_grades:        Vec<ExamGrade>,
     pub partner_requests:   Vec<PartnerRequest>,
     pub submissions:        Vec<SubmissionShort>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct SelfEval {
+    pub uri:                String,
+    pub score:              f64,
+    pub explanation:        String,
 }
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
