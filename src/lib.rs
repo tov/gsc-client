@@ -1,7 +1,7 @@
 #![recursion_limit = "128"]
 
 use vlog::*;
-use percent_encoding::{utf8_percent_encode, PATH_SEGMENT_ENCODE_SET};
+use percent_encoding::{utf8_percent_encode, define_encode_set};
 use std::cell::{Cell, RefCell};
 use std::collections::{hash_map, HashMap};
 use std::io;
@@ -338,7 +338,7 @@ impl GscClient {
 
     fn upload_file(&self, src: &Path, dst: &RemotePattern) -> Result<()> {
         let src_file     = std::fs::File::open(&src)?;
-        let encoded_dst  = utf8_percent_encode(&dst.pat, PATH_SEGMENT_ENCODE_SET);
+        let encoded_dst  = utf8_percent_encode(&dst.pat, ENCODE_SET);
         let base_uri     = self.get_uri_for_submission_files(dst.hw)?;
         let uri          = format!{"{}/{}", base_uri, encoded_dst};
         let mut request  = self.http.put(&uri);
@@ -820,6 +820,10 @@ impl GscClient {
         self.handle_response(&mut response, cookie)?;
         Ok(response)
     }
+}
+
+define_encode_set! {
+    pub ENCODE_SET = [percent_encoding::PATH_SEGMENT_ENCODE_SET] | { '+' }
 }
 
 fn ends_in_slash(path: &Path) -> bool {
