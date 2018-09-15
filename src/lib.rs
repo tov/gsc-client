@@ -87,6 +87,24 @@ impl GscClient {
         self.print_results(response)
     }
 
+    pub fn admin_partners(&self, username: &str, hw: usize) -> Result<()> {
+        let cookie       = self.load_cookie_file()?;
+        let uri          = self.get_uri_for_submission(username, hw, cookie)?;
+        let request      = self.http.get(&uri);
+        let mut response = self.send_request(request)?;
+        let submission: messages::Submission = response.json()?;
+
+        let mut buf      = submission.owner1.name.clone();
+        if let Some(owner2) = &submission.owner2 {
+            buf.push(' ');
+            buf += &owner2.name;
+        }
+
+        v1!("{}", buf);
+
+        Ok(())
+    }
+
     pub fn admin_set_exam(&self,
                           username: &str,
                           number: usize,

@@ -31,6 +31,7 @@ fn main() {
 enum Command {
     AdminDivorce{user: String, hw: usize},
     AdminExtend{user: String, hw: usize, date: String, eval: bool},
+    AdminPartners{user: String, hw: usize},
     AdminSetExam{user: String, exam: usize, num: usize, den: usize},
     AdminSubmissions{hw: usize},
     Auth{user: String},
@@ -60,6 +61,7 @@ fn do_it() -> Result<bool> {
         AdminDivorce{user, hw}       => client.admin_divorce(&user, hw),
         AdminExtend{user, hw, date, eval}
                                      => client.admin_extend(&user, hw, &date, eval),
+        AdminPartners{user, hw}      => client.admin_partners(&user, hw),
         AdminSetExam{user, exam, num, den}
                                      => client.admin_set_exam(&user, exam, num, den),
         AdminSubmissions{hw}         => client.admin_submissions(hw),
@@ -179,6 +181,11 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 let user = subsubmatches.value_of("USER").unwrap().to_owned();
                 let date = subsubmatches.value_of("DATESPEC").unwrap().to_owned();
                 Ok(Command::AdminExtend { hw, user, date, eval })
+            } else if let Some(subsubmatches) = submatches.subcommand_matches("partners") {
+                process_common(subsubmatches, config);
+                let hw   = parse_hw(subsubmatches.value_of("HW").unwrap())?;
+                let user = subsubmatches.value_of("USER").unwrap().to_owned();
+                Ok(Command::AdminPartners { user, hw })
             } else if let Some(subsubmatches) = submatches.subcommand_matches("set_exam") {
                 process_common(subsubmatches, config);
                 let exam = subsubmatches.value_of("EXAM").unwrap().parse_descr("exam number")?;
@@ -358,6 +365,11 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
                 .req_arg("HW", "The homework to extend")
                 .req_arg("USER", "The user to extend")
                 .req_arg("DATESPEC", "The new due date"))
+            .subcommand(SubCommand::with_name("partners")
+                .about("Looks up a partnership")
+                .add_common()
+                .req_arg("HW", "The homework to lookup")
+                .req_arg("USER", "The user to lookup"))
             .subcommand(SubCommand::with_name("set_exam")
                 .about("Sets the grade for an exam")
                 .add_common()
