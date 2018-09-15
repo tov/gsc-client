@@ -59,6 +59,14 @@ impl GscClient {
         self.had_warning.get()
     }
 
+    pub fn admin_csv(&self) -> Result<()> {
+        let uri          = format!("{}/api/grades.csv", self.config.get_endpoint());
+        let request      = self.http.get(&uri);
+        let mut response = self.send_request(request)?;
+        response.copy_to(&mut std::io::stdout())?;
+        Ok(())
+    }
+
     pub fn admin_divorce(&self, username: &str, hw: usize) -> Result<()> {
         let cookie      = self.load_cookie_file()?;
         let uri         = self.get_uri_for_submission(username, hw, cookie)?;

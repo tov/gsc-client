@@ -29,7 +29,7 @@ fn main() {
 }
 
 enum Command {
-    AdminCsv
+    AdminCsv,
     AdminDivorce{user: String, hw: usize},
     AdminExtend{user: String, hw: usize, date: String, eval: bool},
     AdminPartners{user: String, hw: usize},
@@ -59,6 +59,7 @@ fn do_it() -> Result<bool> {
     use self::Command::*;
 
     match command {
+        AdminCsv                     => client.admin_csv(),
         AdminDivorce{user, hw}       => client.admin_divorce(&user, hw),
         AdminExtend{user, hw, date, eval}
                                      => client.admin_extend(&user, hw, &date, eval),
@@ -170,7 +171,10 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
         if let Some(submatches) = matches.subcommand_matches("admin") {
             process_common(submatches, config);
 
-            if let Some(subsubmatches) = submatches.subcommand_matches("divorce") {
+            if let Some(subsubmatches) = submatches.subcommand_matches("csv") {
+                process_common(subsubmatches, config);
+                Ok(Command::AdminCsv)
+            } else if let Some(subsubmatches) = submatches.subcommand_matches("divorce") {
                 process_common(subsubmatches, config);
                 let hw   = parse_hw(subsubmatches.value_of("HW").unwrap())?;
                 let user = subsubmatches.value_of("USER").unwrap().to_owned();
@@ -354,6 +358,9 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
         self.subcommand(SubCommand::with_name("admin")
             .about("Administrative commands")
             .add_common()
+            .subcommand(SubCommand::with_name("csv")
+                .about("Prints the grade spreadsheet")
+                .add_common())
             .subcommand(SubCommand::with_name("divorce")
                 .about("Ends a partnership")
                 .add_common()
