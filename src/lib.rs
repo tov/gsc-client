@@ -360,9 +360,32 @@ impl GscClient {
     }
 
     pub fn deauth(&self) -> Result<()> {
-        let mut cookie_lock = CookieFile::new(self.config.get_cookie_file()?, "")?;
-        cookie_lock.deauth();
-        v2!("Deauthenticated.");
+        let uri          = format!("{}/api/whoami", self.config.get_endpoint());
+        let request      = self.http.delete(&uri);
+        let result       = match self.send_request(request) {
+            Ok(mut response) => match response.json() {
+                Ok(true)  => Ok("Deauthenticated with server."),
+                Ok(false) => Err(format!("Could not deauthenticate with server.")),
+                Err(e)    => Err(format!("Could not understand JSON from server:\n  {}", e)),
+            }
+
+            Err(e)    => match e.kind() {
+                ErrorKind::LoginPlease => Ok("You aren’t authenticated."),
+                _ => Err(format!("Could not deauthenticate with server:\n  {}", e)),
+            }
+        };
+
+        match result {
+            Ok(msg)  => v2!("{}", msg),
+            Err(msg) => {
+                ve1!("{}\nDeleting local credentials anyway.", msg);
+                self.had_warning.set(true);
+            }
+        }
+
+        let mut cookie = CookieFile::new(self.config.get_cookie_file()?, "")?;
+        cookie.deauth();
+
         Ok(())
     }
 
