@@ -58,7 +58,7 @@ impl CookieFile {
             .read(true)
             .write(true)
             .open(cookie_file)
-            .chain_err(|| ErrorKind::LoginPlease)?;
+            .map_err(|_| ErrorKind::LoginPlease)?;
         file.lock_exclusive()?;
 
         let mut buf_reader = std::io::BufReader::new(file);
