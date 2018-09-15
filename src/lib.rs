@@ -605,13 +605,11 @@ impl GscClient {
     }
 
     pub fn whoami(&self) -> Result<()> {
-        let (username, _) = self.load_credentials()?;
-
-        if username.is_empty() {
-            return Err(ErrorKind::LoginPlease.into())
-        }
-
-        v1!("{}", username);
+        let uri          = format!("{}/api/whoami", self.config.get_endpoint());
+        let request      = self.http.get(&uri);
+        let mut response = self.send_request(request)?;
+        let text         = response.text()?;
+        v1!("{}", text);
         Ok(())
     }
 
