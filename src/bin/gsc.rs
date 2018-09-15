@@ -29,6 +29,7 @@ fn main() {
 }
 
 enum Command {
+    AdminCsv
     AdminDivorce{user: String, hw: usize},
     AdminExtend{user: String, hw: usize, date: String, eval: bool},
     AdminPartners{user: String, hw: usize},
