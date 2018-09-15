@@ -50,11 +50,9 @@ enum Command {
 }
 
 fn do_it() -> Result<bool> {
-    let mut config = config::Config::new();
-    config.load_dotfile()?;
-    let command    = GscClientApp::new().process(&mut config)?;
-    config.activate_verbosity();
-    let mut client = GscClient::new(config)?;
+    let mut client = GscClient::new()?;
+    let command    = GscClientApp::new().process(client.config_mut())?;
+    client.config().activate_verbosity();
 
     use self::Command::*;
 
@@ -458,7 +456,6 @@ mod re {
         pub static ref HW_ONLY:         Regex = Regex::new(r"^hw(\d+):?$").unwrap();
         pub static ref HW_OPT_FILE:     Regex = Regex::new(r"^hw(\d+)(?::(.*))?$").unwrap();
         pub static ref HW_FILE:         Regex = Regex::new(r"^hw(\d+):(.*)$").unwrap();
-        pub static ref HW_FILE_NE:      Regex = Regex::new(r"^hw(\d+):(.+)$").unwrap();
         pub static ref LOCAL_FILE:      Regex = Regex::new(r"^:(.+)$").unwrap();
     }
 }

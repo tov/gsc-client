@@ -35,13 +35,24 @@ pub enum CpArg {
 }
 
 impl GscClient {
-    pub fn new(config: config::Config) -> Result<Self> {
+    pub fn new() -> Result<Self> {
+        let mut config = config::Config::new();
+        config.load_dotfile()?;
+
         Ok(GscClient {
             http:               reqwest::Client::new(),
             config,
             submission_uris:    RefCell::new(HashMap::new()),
             had_warning:        Cell::new(false),
         })
+    }
+
+    pub fn config(&self) -> &config::Config {
+        &self.config
+    }
+
+    pub fn config_mut(&mut self) -> &mut config::Config {
+        &mut self.config
     }
 
     pub fn had_warning(&self) -> bool {
