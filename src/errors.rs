@@ -60,9 +60,9 @@ error_chain! {
             display("You are not logged in; use the ‘gsc auth’ command to authenticate.")
         }
 
-        NoDotfileGiven {
-            description("no dotfile given")
-            display("Please specify a configuration file.")
+        NoCookieFileGiven {
+            description("no cookie file given")
+            display("Please specify a cookie file.")
         }
 
         NoSuchRemoteFile(rpat: RemotePattern) {

@@ -1,20 +1,23 @@
 use gsc_client::*;
 use gsc_client::errors::{Result, ResultExt, ErrorKind, syntax_error};
+
+use vlog::*;
+
 use std::error::Error;
 use std::process::exit;
 use std::str::FromStr;
 
 fn main() {
-    vlog::set_verbosity_level(1);
+    vlog::set_verbosity_level(3);
 
     match do_it() {
         Err(err)  => {
-            eprintln!("{}", err);
+            ve1!("{}", err);
 
             let mut cause = err.cause();
 
             while let Some(error) = cause {
-                eprintln!("Cause: {}", error);
+                ve1!("Cause: {}", error);
                 cause = error.cause();
             }
 
@@ -50,6 +53,7 @@ fn do_it() -> Result<bool> {
     let mut config = config::Config::new();
     config.load_dotfile()?;
     let command    = GscClientApp::new().process(&mut config)?;
+    config.activate_verbosity();
     let mut client = GscClient::new(config)?;
 
     use self::Command::*;
@@ -84,10 +88,10 @@ fn do_it() -> Result<bool> {
 struct GscClientApp<'a: 'b, 'b>(clap::App<'a, 'b>);
 
 fn process_common<'a>(matches: &clap::ArgMatches<'a>, config: &mut config::Config) {
-    let vs = matches.occurrences_of("VERBOSE") as usize;
-    let qs = matches.occurrences_of("QUIET") as usize;
-    let verbosity = if qs > vs { 0 } else { vlog::get_verbosity_level() + vs - qs };
-    vlog::set_verbosity_level(verbosity);
+    let vs = matches.occurrences_of("VERBOSE") as isize;
+    let qs = matches.occurrences_of("QUIET") as isize;
+    let verbosity = config.get_verbosity() + vs - qs;
+    config.set_verbosity(verbosity);
 
     if let Some(user) = matches.value_of("ME") {
         config.set_on_behalf(user.to_owned());
@@ -159,7 +163,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
     }
 
     fn process(self, config: &mut config::Config) -> Result<Command> {
-        let matches = self.0.get_matches_safe()?;
+        let matches = self.0.get_matches();
         process_common(&matches, config);
 
         if let Some(submatches) = matches.subcommand_matches("admin") {

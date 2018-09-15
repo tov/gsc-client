@@ -7,13 +7,14 @@ use std::collections::{hash_map, HashMap};
 use std::io;
 use std::path::{Path, PathBuf};
 
+pub mod cookie;
 pub mod config;
 pub mod errors;
 pub mod messages;
 pub mod table;
 
 use self::errors::*;
-use self::config::DotfileLock;
+use self::cookie::*;
 
 pub struct GscClient {
     http:               reqwest::Client,
@@ -48,7 +49,8 @@ impl GscClient {
     }
 
     pub fn admin_divorce(&self, username: &str, hw: usize) -> Result<()> {
-        let uri         = self.get_uri_for_submission(username, hw)?;
+        let cookie      = self.load_cookie_file()?;
+        let uri         = self.get_uri_for_submission(username, hw, cookie)?;
         let mut message = messages::SubmissionChange::default();
         message.owner2  = Some(());
         let mut request = self.http.patch(&uri);
@@ -60,7 +62,8 @@ impl GscClient {
     pub fn admin_extend(&self, username: &str, hw: usize, datetime: &str, eval: bool)
         -> Result<()> {
 
-        let uri          = self.get_uri_for_submission(username, hw)?;
+        let cookie       = self.load_cookie_file()?;
+        let uri          = self.get_uri_for_submission(username, hw, cookie)?;
         let mut message  = messages::SubmissionChange::default();
         if eval {
             message.eval_date = Some(datetime.to_owned());
@@ -92,9 +95,9 @@ impl GscClient {
 
     pub fn admin_submissions(&self, hw: usize) -> Result<()> {
 
-        let uri        = format!("{}/api/submissions/hw{}", self.config.get_endpoint(), hw);
-        let request    = self.http.get(&uri);
-        let mut result = self.send_request(request)?;
+        let uri         = format!("{}/api/submissions/hw{}", self.config.get_endpoint(), hw);
+        let request     = self.http.get(&uri);
+        let mut result  = self.send_request(request)?;
         let submissions: Vec<messages::SubmissionShort> = result.json()?;
 
         let mut table = table::TextTable::new(" %r  %l  %l\n");
@@ -114,7 +117,7 @@ impl GscClient {
     pub fn auth(&mut self, username: &str) -> Result<()> {
         let uri = self.user_uri(username);
 
-        self.config.set_username(username.to_owned());
+        let cookie_file = self.config.get_cookie_file()?;
 
         loop {
             let password = prompt_password("Password", username)?;
@@ -122,7 +125,7 @@ impl GscClient {
                 .basic_auth(username, Some(password))
                 .send()?;
 
-            let cookie_lock = self.config.new_cookie()?;
+            let cookie_lock = CookieFile::new(cookie_file, username)?;
             match self.handle_response(&mut response, cookie_lock) {
                 Ok(()) => {
                     v2!("Authenticated as {}", username);
@@ -232,7 +235,9 @@ impl GscClient {
         Ok(())
     }
 
-    fn download_file(&self, src: &RemotePattern, rel_uri: &str, dst: &Path) -> Result<()> {
+    fn download_file(&self, src: &RemotePattern, rel_uri: &str, dst: &Path)
+        -> Result<()> {
+
         let mut file = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -317,7 +322,7 @@ impl GscClient {
     }
 
     pub fn deauth(&self) -> Result<()> {
-        let mut cookie_lock = self.config.new_cookie()?;
+        let mut cookie_lock = CookieFile::new(self.config.get_cookie_file()?, "")?;
         cookie_lock.deauth();
         v2!("Deauthenticated.");
         Ok(())
@@ -345,8 +350,6 @@ impl GscClient {
     }
 
     pub fn create(&mut self, username: &str) -> Result<()> {
-        self.config.set_username(username.to_owned());
-
         let password = get_matching_passwords(username)?;
         let uri      = format!("{}/api/users", self.config.get_endpoint());
 
@@ -354,7 +357,7 @@ impl GscClient {
         let mut response = self.http.post(&uri)
             .basic_auth(username, Some(password))
             .send()?;
-        let cookie_lock = self.config.new_cookie()?;
+        let cookie_lock = CookieFile::new(self.config.get_cookie_file()?, username)?;
         self.handle_response(&mut response, cookie_lock)?;
 
         v2!("Created account: {}.", username);
@@ -386,10 +389,10 @@ impl GscClient {
     }
 
     pub fn partner(&self) -> Result<()> {
-        let user         = self.select_user();
-        let uri          = self.user_uri(&user);
-        let request      = self.http.get(&uri);
-        let mut response = self.send_request(request)?;
+        let (user, cookie) = self.load_credentials()?;
+        let uri            = self.user_uri(&user);
+        let request        = self.http.get(&uri);
+        let mut response   = self.send_request_with_cookie(request, cookie)?;
         let user: messages::User = response.json()?;
         self.print_partner_status(&user, "");
         Ok(())
@@ -413,9 +416,9 @@ impl GscClient {
                          them: &str)
         -> Result<()> {
 
-        let me          = self.select_user();
-        let uri         = self.user_uri(&me);
-        let mut message = messages::UserChange::default();
+        let (me, cookie) = self.load_credentials()?;
+        let uri          = self.user_uri(&me);
+        let mut message  = messages::UserChange::default();
         message.partner_requests = vec![
             messages::PartnerRequest {
                 assignment_number:  hw,
@@ -426,19 +429,19 @@ impl GscClient {
 
         let mut request = self.http.patch(&uri);
         request.json(&message);
-        let response    = self.send_request(request)?;
+        let response    = self.send_request_with_cookie(request, cookie)?;
         self.print_results(response)
     }
 
     pub fn passwd(&self) -> Result<()> {
-        let user         = self.select_user();
-        let password     = get_matching_passwords(&user)?;
+        let (me, cookie) = self.load_credentials()?;
+        let password     = get_matching_passwords(&me)?;
         let mut message  = messages::UserChange::default();
         message.password = Some(password);
-        let uri          = self.user_uri(&user);
+        let uri          = self.user_uri(&me);
         let mut request  = self.http.patch(&uri);
         request.json(&message);
-        let response     = self.send_request(request)?;
+        let response     = self.send_request_with_cookie(request, cookie)?;
         self.print_results(response)
     }
 
@@ -466,8 +469,8 @@ impl GscClient {
 
     pub fn status_hw(&self, number: usize) -> Result<()>
     {
-        let user         = self.select_user();
-        let uri          = self.get_uri_for_submission(&user, number)?;
+        let (me, cookie) = self.load_credentials()?;
+        let uri          = self.get_uri_for_submission(&me, number, cookie)?;
         let request      = self.http.get(&uri);
         let mut response = self.send_request(request)?;
 
@@ -512,10 +515,10 @@ impl GscClient {
     }
 
     pub fn status_user(&self) -> Result<()> {
-        let user         = self.select_user();
-        let uri          = self.user_uri(&user);
+        let (me, cookie) = self.load_credentials()?;
+        let uri          = self.user_uri(&me);
         let request      = self.http.get(&uri);
-        let mut response = self.send_request(request)?;
+        let mut response = self.send_request_with_cookie(request, cookie)?;
 
         let user: messages::User = response.json()?;
 
@@ -564,7 +567,7 @@ impl GscClient {
     }
 
     pub fn whoami(&self) -> Result<()> {
-        let username = self.config.get_username();
+        let (username, _) = self.load_credentials()?;
 
         if username.is_empty() {
             return Err(ErrorKind::LoginPlease.into())
@@ -590,16 +593,18 @@ impl GscClient {
             .collect())
     }
 
-    fn fetch_submissions(&self, user: &str) -> Result<Vec<messages::SubmissionShort>> {
+    fn fetch_submissions(&self, user: &str, cookie: CookieFile)
+        -> Result<Vec<messages::SubmissionShort>> {
+
         let uri          = self.user_uri(user) + "/submissions";
         let request      = self.http.get(&uri);
-        let mut response = self.send_request(request)?;
+        let mut response = self.send_request_with_cookie(request, cookie)?;
         response.json()
             .chain_err(|| "Could not understand response from server")
     }
 
-    fn get_submission_uris(&self, user: &str) -> Result<Vec<Option<String>>> {
-        let submissions = self.fetch_submissions(user)?;
+    fn get_submission_uris(&self, user: &str, cookie: CookieFile) -> Result<Vec<Option<String>>> {
+        let submissions = self.fetch_submissions(user, cookie)?;
         let mut result  = Vec::new();
 
         for submission in &submissions {
@@ -615,11 +620,15 @@ impl GscClient {
         Ok(result)
     }
 
-    fn get_uri_for_submission(&self, user: &str, number: usize) -> Result<String> {
+    fn get_uri_for_submission(&self, user: &str, number: usize, cookie: CookieFile)
+        -> Result<String> {
+
         let mut cache = self.submission_uris.borrow_mut();
         let uris      = match cache.entry(user.to_owned()) {
-            hash_map::Entry::Occupied(entry) => entry.into_mut(),
-            hash_map::Entry::Vacant(entry)   => entry.insert(self.get_submission_uris(&user)?),
+            hash_map::Entry::Occupied(entry) =>
+                entry.into_mut(),
+            hash_map::Entry::Vacant(entry)   =>
+                entry.insert(self.get_submission_uris(&user, cookie)?),
         };
 
         match uris.get(number) {
@@ -629,11 +638,11 @@ impl GscClient {
     }
 
     fn get_uri_for_submission_files(&self, number: usize) -> Result<String> {
-        let user = self.select_user();
-        self.get_uri_for_submission(&user, number).map(|uri| uri + "/files")
+        let (user, cookie) = self.load_credentials()?;
+        self.get_uri_for_submission(&user, number, cookie).map(|uri| uri + "/files")
     }
 
-    fn handle_response(&self, response: &mut reqwest::Response, cookie_lock: DotfileLock)
+    fn handle_response(&self, response: &mut reqwest::Response, cookie_lock: CookieFile)
                        -> Result<()> {
 
         self.save_cookie(response, cookie_lock)?;
@@ -646,12 +655,14 @@ impl GscClient {
         }
     }
 
-    fn prepare_cookie(&self, request: &mut reqwest::RequestBuilder) -> Result<DotfileLock> {
-        let cookie_lock = self.config.lock_dotfile()?;
-        let cookie      = cookie_lock.get_cookie_header();
+    fn prepare_cookie(&self, request: &mut reqwest::RequestBuilder,
+                      cookie_lock: &CookieFile)
+        -> Result<()>
+    {
+        let cookie = cookie_lock.get_cookie_header();
         ve3!("> Sending cookie {}", cookie);
         request.header(cookie);
-        Ok(cookie_lock)
+        Ok(())
     }
 
     fn print_partner_status(&self, user: &messages::User, indent: &str) {
@@ -704,7 +715,7 @@ impl GscClient {
         format!("{}/api/users/{}", self.config.get_endpoint(), user)
     }
 
-    fn save_cookie(&self, response: &reqwest::Response, mut cookie_lock: DotfileLock)
+    fn save_cookie(&self, response: &reqwest::Response, mut cookie_lock: CookieFile)
                    -> Result<()> {
 
         if let Some(reqwest::header::SetCookie(chunks)) = response.headers().get() {
@@ -717,21 +728,37 @@ impl GscClient {
         Ok(())
     }
 
-    fn select_user(&self) -> String {
-        match self.config.get_on_behalf() {
-            Some(s) => s,
-            None    => self.config.get_username(),
-        }.to_owned()
+    fn load_cookie_file(&self) -> Result<CookieFile> {
+        CookieFile::lock(self.config.get_cookie_file()?)
     }
 
-    fn send_request(&self, mut req_builder: reqwest::RequestBuilder)
+    fn load_credentials(&self) -> Result<(String, CookieFile)> {
+        let cookie_file = self.load_cookie_file()?;
+
+        let user        = match self.config.get_on_behalf() {
+            Some(s) => s,
+            None    => cookie_file.get_username()
+        }.to_owned();
+
+        Ok((user, cookie_file))
+    }
+
+    fn send_request(&self, req_builder: reqwest::RequestBuilder)
         -> Result<reqwest::Response> {
 
-        let cookie_lock = self.prepare_cookie(&mut req_builder)?;
-        let request     = req_builder.build()?;
+        let cookie = self.load_cookie_file()?;
+        self.send_request_with_cookie(req_builder, cookie)
+    }
+
+    fn send_request_with_cookie(&self, mut req_builder: reqwest::RequestBuilder,
+                                cookie: CookieFile)
+        -> Result<reqwest::Response> {
+
+        self.prepare_cookie(&mut req_builder, &cookie)?;
+        let request      = req_builder.build()?;
         ve3!("> Sending request to {}", request.url());
         let mut response = self.http.execute(request)?;
-        self.handle_response(&mut response, cookie_lock)?;
+        self.handle_response(&mut response, cookie)?;
         Ok(response)
     }
 }
@@ -756,7 +783,7 @@ fn glob(pattern: &str) -> Result<globset::GlobMatcher> {
     Ok(globset::Glob::new(real_pattern)?.compile_matcher())
 }
 
-pub (crate) fn parse_cookie(cookie: &str) -> Option<(String, String)> {
+pub fn parse_cookie(cookie: &str) -> Option<(String, String)> {
     let pair = match cookie.find(';') {
         Some(index) => &cookie[.. index],
         None        => cookie,
@@ -788,8 +815,10 @@ fn prompt_password(prompt: &str, username: &str) -> Result<String> {
 fn soft_create_dir(path: &Path) -> Result<()> {
     match std::fs::create_dir(path) {
         Ok(_)  => Ok(()),
-        Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
-        Err(e) => Err(e)?,
+        Err(e) => match e.kind() {
+            io::ErrorKind::AlreadyExists => Ok(()),
+            _                            => Err(e)?,
+        }
     }
 }
 
