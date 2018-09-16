@@ -2,6 +2,8 @@
 
 use vlog::*;
 use percent_encoding::{utf8_percent_encode, define_encode_set};
+use thousands::Separable;
+
 use std::cell::{Cell, RefCell};
 use std::collections::{hash_map, HashMap};
 use std::io;
@@ -484,7 +486,7 @@ impl GscClient {
         for file in &files {
             table.add_row(
                 table::Row::new()
-                    .add_cell(file.byte_count)
+                    .add_cell(file.byte_count.separate_with_commas())
                     .add_cell(&file.upload_time)
                     .add_cell(file.purpose.to_char())
                     .add_cell(&file.name));
@@ -604,10 +606,10 @@ impl GscClient {
             .add_row(table::Row::new().add_cell("Last modified:")
                 .add_cell(submission.last_modified))
             .add_row(table::Row::new().add_cell("Quota remaining:")
-                .add_cell(format!("{:.1}% ({}/{} bytes used)",
+                .add_cell(format!("{:.1}% ({} of {} bytes used)",
                                   quota_remaining,
-                                  submission.bytes_used,
-                                  submission.bytes_quota)));
+                                  submission.bytes_used.separate_with_commas(),
+                                  submission.bytes_quota.separate_with_commas())));
 
         let mut owners = submission.owner1.name.clone();
         if let Some(owner2) = &submission.owner2 {
