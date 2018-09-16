@@ -33,6 +33,7 @@ enum Command {
     AdminDivorce{user: String, hw: usize},
     AdminExtend{user: String, hw: usize, date: String, eval: bool},
     AdminPartners{user: String, hw: usize},
+    AdminSetAuto{user: String, hw: usize, score: f64, comment: String},
     AdminSetExam{user: String, exam: usize, num: usize, den: usize},
     AdminSubmissions{hw: usize},
     Auth{user: String},
@@ -64,6 +65,8 @@ fn do_it() -> Result<bool> {
         AdminExtend{user, hw, date, eval}
                                      => client.admin_extend(&user, hw, &date, eval),
         AdminPartners{user, hw}      => client.admin_partners(&user, hw),
+        AdminSetAuto{user, hw, score, comment}
+        => client.admin_set_auto(&user, hw, score, &comment),
         AdminSetExam{user, exam, num, den}
                                      => client.admin_set_exam(&user, exam, num, den),
         AdminSubmissions{hw}         => client.admin_submissions(hw),
@@ -191,6 +194,13 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 let hw   = parse_hw(subsubmatches.value_of("HW").unwrap())?;
                 let user = subsubmatches.value_of("USER").unwrap().to_owned();
                 Ok(Command::AdminPartners { user, hw })
+            } else if let Some(subsubmatches) = submatches.subcommand_matches("set_auto") {
+                process_common(subsubmatches, config);
+                let hw      = parse_hw(subsubmatches.value_of("HW").unwrap())?;
+                let user    = subsubmatches.value_of("USER").unwrap().to_owned();
+                let score   = subsubmatches.value_of("SCORE").unwrap().parse()?;
+                let comment = subsubmatches.value_of("COMMENT").unwrap().to_owned();
+                Ok(Command::AdminSetAuto { hw, user, score, comment })
             } else if let Some(subsubmatches) = submatches.subcommand_matches("set_exam") {
                 process_common(subsubmatches, config);
                 let exam = subsubmatches.value_of("EXAM").unwrap().parse_descr("exam number")?;
@@ -378,6 +388,13 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
                 .add_common()
                 .req_arg("HW", "The homework to lookup")
                 .req_arg("USER", "The user to lookup"))
+            .subcommand(SubCommand::with_name("set_auto")
+                .about("Records the result of the autograder")
+                .add_common()
+                .req_arg("HW", "The homework to set the grade on")
+                .req_arg("USER", "The user whose grade to set")
+                .req_arg("SCORE", "The score [0.0, 1.0]")
+                .req_arg("COMMENT", "A comment"))
             .subcommand(SubCommand::with_name("set_exam")
                 .about("Sets the grade for an exam")
                 .add_common()

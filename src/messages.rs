@@ -3,13 +3,6 @@ use serde_derive::{Serialize, Deserialize};
 #[derive(Clone, Deserialize, Debug)]
 pub struct DateTime(chrono::DateTime<chrono::offset::FixedOffset>);
 
-#[derive(Clone, Deserialize, Debug)]
-pub struct EvalShort {
-    pub uri:            String,
-    pub sequence:       usize,
-    pub submission_uri: String,
-}
-
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum EvalType {
@@ -18,7 +11,7 @@ pub enum EvalType {
     Informational,
 }
 #[derive(Deserialize, Debug)]
-pub struct ShortEval {
+pub struct EvalShort {
     pub uri:            String,
     pub sequence:       usize,
     pub submission_uri: String,
@@ -68,7 +61,7 @@ pub enum GraderEvalStatus {
     Ready,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct GraderEval {
     pub uri:            String,
     pub grader:         String,
@@ -178,6 +171,7 @@ pub struct Submission {
     pub uri:                String,
     pub grade:              f64,
     pub files_uri:          String,
+    pub evals_uri:          String,
     pub owner1:             UserShort,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub owner2:             Option<UserShort>,

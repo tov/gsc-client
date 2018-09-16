@@ -113,6 +113,46 @@ impl GscClient {
         Ok(())
     }
 
+    pub fn admin_set_auto(&self,
+                          username: &str,
+                          hw: usize,
+                          score: f64,
+                          comment: &str) -> Result<()> {
+
+        let cookie       = self.load_cookie_file()?;
+        let uri          = self.get_uri_for_submission(username, hw, cookie)?;
+        let request      = self.http.get(&uri);
+        let mut response = self.send_request(request)?;
+        let submission: messages::Submission = response.json()?;
+
+        let uri          = format!("{}{}", self.config.get_endpoint(), submission.evals_uri);
+        let request      = self.http.get(&uri);
+        let mut response = self.send_request(request)?;
+        let evals: Vec<messages::EvalShort> = response.json()?;
+
+        let eval = evals
+            .iter()
+            .filter(|eval| eval.eval_type == messages::EvalType::Informational)
+            .last()
+            .chain_err(|| ErrorKind::NoInformationalEvalItem)?;
+
+        let uri          = format!("{}{}/grader", self.config.get_endpoint(), eval.uri);
+        let mut request  = self.http.put(&uri);
+        let message      = messages::GraderEval {
+            uri,
+            grader:      "root".to_owned(),
+            score,
+            explanation: comment.to_owned(),
+            status:      messages::GraderEvalStatus::Ready,
+        };
+        request.json(&message);
+        let mut response = self.send_request(request)?;
+        let result: messages::GraderEval = response.json()?;
+
+        v2!("Set user {}’s hw{}, item {} to {}", username, hw, eval.sequence, result.score);
+        Ok(())
+    }
+
     pub fn admin_set_exam(&self,
                           username: &str,
                           number: usize,

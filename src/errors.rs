@@ -23,6 +23,7 @@ error_chain! {
         Globset(globset::Error);
         Io(std::io::Error);
         ParseInt(std::num::ParseIntError);
+        ParseFloat(std::num::ParseFloatError);
         Reqwest(reqwest::Error);
         SerdeYaml(serde_yaml::Error);
     }
@@ -115,6 +116,11 @@ error_chain! {
         CommandRequiresFlag(command: String) {
             description("command requires ‘-a’ flag")
             display("To ‘{}’ a whole homework, you must provide the ‘-a’ flag.", command)
+        }
+
+        NoInformationalEvalItem {
+            description("no informational eval item")
+            display("Could not find informational eval item to add score to.")
         }
     }
 }
