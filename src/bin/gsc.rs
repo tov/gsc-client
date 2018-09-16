@@ -66,7 +66,7 @@ fn do_it() -> Result<bool> {
                                      => client.admin_extend(&user, hw, &date, eval),
         AdminPartners{user, hw}      => client.admin_partners(&user, hw),
         AdminSetAuto{user, hw, score, comment}
-        => client.admin_set_auto(&user, hw, score, &comment),
+                                     => client.admin_set_auto(&user, hw, score, &comment),
         AdminSetExam{user, exam, num, den}
                                      => client.admin_set_exam(&user, exam, num, den),
         AdminSubmissions{hw}         => client.admin_submissions(hw),
