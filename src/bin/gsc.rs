@@ -39,7 +39,7 @@ enum Command {
     Auth{user: String},
     Cat{rpats: Vec<RemotePattern>},
     Create{user: String},
-    Cp{all: bool, srcs: Vec<CpArg>, dst: CpArg},
+    Cp{srcs: Vec<CpArg>, dst: CpArg},
     Deauth,
     Ls{rpat: RemotePattern},
     Partner,
@@ -73,7 +73,7 @@ fn do_it() -> Result<bool> {
         Auth{user}                   => client.auth(&user),
         Cat{rpats}                   => client.cat(&rpats),
         Create{user}                 => client.create(&user),
-        Cp{all, srcs, dst}           => client.cp(all, &srcs, &dst),
+        Cp{srcs, dst}                => client.cp(&srcs, &dst),
         Deauth                       => client.deauth(),
         Ls{rpat}                     => client.ls(&rpat),
         Partner                      => client.partner(),
@@ -262,7 +262,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 srcs.push(arg);
             }
 
-            Ok(Command::Cp{all, srcs, dst})
+            Ok(Command::Cp{srcs, dst})
         }
 
         else if let Some(submatches) = matches.subcommand_matches("deauth") {

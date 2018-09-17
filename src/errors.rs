@@ -92,9 +92,9 @@ error_chain! {
             display("Filename not proper UTF-8: ‘{}’.", filename.display())
         }
 
-        MultipleSourcesOneDestination(dst: String) {
+        MultipleSourcesOneDestination {
             description("multiple sources one destination")
-            display("Multiple source files cannot be copied to one destination file: ‘{}’", dst)
+            display("Multiple source files cannot be copied to one destination file.")
         }
 
         DestinationPatternIsMultiple(rpat: RemotePattern, rfiles: RemoteFiles) {
@@ -102,9 +102,9 @@ error_chain! {
             display("Destination pattern ‘{}’ resolves to multiple remote files:\n{}", rpat, rfiles)
         }
 
-        SourceDirToDestinationFile(src: usize, dst: PathBuf) {
-            description("source directory to destination file")
-            display("Cannot copy source directory ‘hw{}’ over file destination ‘{}’.",
+        SourceHwToDestinationFile(src: usize, dst: PathBuf) {
+            description("source homework to destination file")
+            display("Cannot copy whole source homework ‘hw{}’ over file destination ‘{}’.",
                     src, dst.display())
         }
 

@@ -219,14 +219,14 @@ impl GscClient {
         }
     }
 
-    pub fn cp(&self, all: bool, srcs: &[CpArg], dst: &CpArg) -> Result<()> {
+    pub fn cp(&self, srcs: &[CpArg], dst: &CpArg) -> Result<()> {
         match dst {
-            CpArg::Local(filename) => self.cp_dn(all, srcs, filename),
+            CpArg::Local(filename) => self.cp_dn(srcs, filename),
             CpArg::Remote(rpat)    => self.cp_up(srcs, rpat),
         }
     }
 
-    fn cp_dn(&self, all: bool, raw_srcs: &[CpArg], dst: &Path) -> Result<()> {
+    fn cp_dn(&self, raw_srcs: &[CpArg], dst: &Path) -> Result<()> {
         let mut src_rpats = Vec::new();
 
         for src in raw_srcs {
@@ -258,55 +258,51 @@ impl GscClient {
                 }
         };
 
-        let mut src_files = Vec::new();
-
-        for src_rpat in &src_rpats {
-            let whole_hw = src_rpat.pat.is_empty();
-            src_files.extend(
-                self.fetch_file_list(src_rpat)?
-                    .into_iter()
-                    .map(|meta| {
-                        let hw  = src_rpat.hw;
-                        let pat = meta.name.clone();
-                        (meta, whole_hw, RemotePattern { hw, pat })
-                    }));
-        }
-
         match dst_type {
-            // cp FILE FILE
-            DstType::File if src_files.len() == 1 =>
-                if src_files[0].1 {
-                    // cp -a hwN: FILE # error!
-                    Err(ErrorKind::SourceDirToDestinationFile(src_files[0].2.hw,
-                                                              dst.to_owned()))?;
+            DstType::File => {
+                if src_rpats.len() != 1 {
+                    Err(ErrorKind::MultipleSourcesOneDestination)?;
+                }
+
+                let src_rpat = src_rpats[0];
+
+                if src_rpat.pat.is_empty() {
+                    Err(ErrorKind::SourceHwToDestinationFile(src_rpat.hw, dst.to_owned()))?;
                 } else {
-                    self.download_file(&src_files[0].2, &src_files[0].0.uri, dst)?;
+                    let src_file = self.fetch_one_filename(src_rpat)?;
+                    self.download_file(src_rpat.hw, &src_file, dst)?;
+                }
+            }
+
+            DstType::DoesNotExist => {
+                if src_rpats.len() != 1 {
+                    Err(ErrorKind::MultipleSourcesOneDestination)?;
                 }
 
-            // cp FILE FILE...+ FILE  # error!
-            DstType::File =>
-                Err(ErrorKind::MultipleSourcesOneDestination(dst.display().to_string()))?,
+                let src_rpat = src_rpats[0];
 
-            // cp FILE FILE_DNE
-            DstType::DoesNotExist if src_files.len() == 1 && !src_files[0].1 && !ends_in_slash(dst) =>
-                self.download_file(&src_files[0].2, &src_files[0].0.uri, dst)?,
-
-            // cp FILE... DIR
-            // cp FILE... DIR_DNE
-            _ => {
-                // cp -a ...
-                if all {
+                if src_rpat.pat.is_empty() {
                     soft_create_dir(dst)?;
+                    self.download_hw(src_rpat.hw, dst)?;
+                } else {
+                    let src_file = self.fetch_one_filename(src_rpat)?;
+                    self.download_file(src_rpat.hw, &src_file, dst)?;
                 }
+            }
 
-                for (meta, whole_hw, rpat) in &src_files {
-                    let mut file_dst = dst.to_owned();
-                    if *whole_hw {
-                        file_dst.push(meta.purpose.to_dir());
-                        soft_create_dir(&file_dst)?;
+            DstType::Dir => {
+                for src_rpat in src_rpats {
+                    if src_rpat.pat.is_empty() {
+                        self.download_hw(src_rpat.hw, dst)?;
+                    } else {
+                        let src_metas = self.fetch_nonempty_file_list(src_rpat)?;
+
+                        for src_meta in src_metas {
+                            let mut file_dst = dst.to_owned();
+                            file_dst.push(&src_meta.name);
+                            self.download_file(src_rpat.hw, &src_meta, &file_dst)?;
+                        }
                     }
-                    file_dst.push(&meta.name);
-                    self.download_file(rpat, &meta.uri, &file_dst)?;
                 }
             }
         }
@@ -315,7 +311,7 @@ impl GscClient {
         Ok(())
     }
 
-    fn download_file(&self, src: &RemotePattern, rel_uri: &str, dst: &Path)
+    fn download_file(&self, hw: usize, meta: &messages::FileMeta, dst: &Path)
         -> Result<()> {
 
         let mut file = std::fs::OpenOptions::new()
@@ -324,11 +320,26 @@ impl GscClient {
             .truncate(true)
             .open(dst)?;
 
-        let uri          = format!("{}{}", self.config.get_endpoint(), rel_uri);
+        let uri          = format!("{}{}", self.config.get_endpoint(), meta.uri);
         let request      = self.http.get(&uri);
-        ve2!("Downloading ‘{}’ -> ‘{}’...", src, dst.display());
+        ve2!("Downloading ‘hw{}:{}’ -> ‘{}’...", hw, meta.name, dst.display());
         let mut response = self.send_request(request)?;
         response.copy_to(&mut file)?;
+
+        Ok(())
+    }
+
+    fn download_hw(&self, hw: usize, dst: &Path) -> Result<()> {
+        let rpat      = RemotePattern { hw, pat: String::new() };
+        let src_metas = self.fetch_file_list(&rpat)?;
+
+        for src_meta in src_metas {
+            let mut file_dst = dst.to_owned();
+            file_dst.push(src_meta.purpose.to_dir());
+            soft_create_dir(&file_dst)?;
+            file_dst.push(&src_meta.name);
+            self.download_file(hw, &src_meta, &file_dst)?;
+        }
 
         Ok(())
     }
@@ -361,7 +372,7 @@ impl GscClient {
             let src = if srcs.len() == 1 {
                 &srcs[0]
             } else {
-                Err(ErrorKind::MultipleSourcesOneDestination(dst.to_string()))?
+                Err(ErrorKind::MultipleSourcesOneDestination)?
             };
 
             let dsts     = self.fetch_file_list(dst)?;
@@ -439,13 +450,7 @@ impl GscClient {
 
     pub fn cat(&self, pats: &[RemotePattern]) -> Result<()> {
         for rpat in pats {
-            let files = self.fetch_file_list(&rpat)?;
-
-            if files.is_empty() {
-                let error = Error::from(ErrorKind::NoSuchRemoteFile(rpat.clone()));
-                ve1!("{}", error);
-                self.had_warning.set(true);
-            }
+            let files = self.fetch_nonempty_file_list(&rpat)?;
 
             for file in files {
                 let uri          = format!("{}{}", self.config.get_endpoint(), file.uri);
@@ -476,12 +481,8 @@ impl GscClient {
 
     pub fn ls(&self, rpat: &RemotePattern) -> Result<()> {
 
-        let files     = self.fetch_file_list(&rpat)?;
         let mut table = table::TextTable::new("%r  %l  [%l] %l\n");
-
-        if files.is_empty() {
-            return Err(ErrorKind::NoSuchRemoteFile(rpat.clone()).into());
-        }
+        let files     = self.fetch_nonempty_file_list(&rpat)?;
 
         for file in &files {
             table.add_row(
@@ -700,6 +701,29 @@ impl GscClient {
             .collect())
     }
 
+    fn fetch_nonempty_file_list(&self, rpat: &RemotePattern) -> Result<Vec<messages::FileMeta>> {
+        let result = self.fetch_file_list(rpat)?;
+
+        if result.is_empty() {
+            let warning = Error::from(ErrorKind::NoSuchRemoteFile(rpat.clone()));
+            ve1!("{}", warning);
+            self.had_warning.set(true);
+        }
+
+        Ok(result)
+    }
+
+    fn fetch_one_filename(&self, rpat: &RemotePattern) -> Result<messages::FileMeta>
+    {
+        let mut files = self.fetch_file_list(rpat)?;
+
+        match files.len() {
+            0 => Err(ErrorKind::NoSuchRemoteFile(rpat.clone()))?,
+            1 => Ok(files.pop().unwrap()),
+            _ => Err(ErrorKind::MultipleSourcesOneDestination)?,
+        }
+    }
+
     fn fetch_submissions(&self, user: &str, cookie: CookieFile)
         -> Result<Vec<messages::SubmissionShort>> {
 
@@ -872,10 +896,6 @@ impl GscClient {
 
 define_encode_set! {
     pub ENCODE_SET = [percent_encoding::PATH_SEGMENT_ENCODE_SET] | { '+' }
-}
-
-fn ends_in_slash(path: &Path) -> bool {
-    path.to_str().unwrap_or("").ends_with('/')
 }
 
 fn get_matching_passwords(username: &str) -> Result<String> {
