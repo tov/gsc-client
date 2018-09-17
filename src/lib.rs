@@ -266,7 +266,7 @@ impl GscClient {
 
                 let src_rpat = src_rpats[0];
 
-                if src_rpat.pat.is_empty() {
+                if src_rpat.is_whole_hw() {
                     Err(ErrorKind::SourceHwToDestinationFile(src_rpat.hw, dst.to_owned()))?;
                 } else {
                     let src_file = self.fetch_one_filename(src_rpat)?;
@@ -281,7 +281,7 @@ impl GscClient {
 
                 let src_rpat = src_rpats[0];
 
-                if src_rpat.pat.is_empty() {
+                if src_rpat.is_whole_hw() {
                     soft_create_dir(dst)?;
                     self.download_hw(src_rpat.hw, dst)?;
                 } else {
@@ -293,7 +293,7 @@ impl GscClient {
             DstType::Dir => {
                 for src_rpat in src_rpats {
                     self.try_warn(|| {
-                        if src_rpat.pat.is_empty() {
+                        if src_rpat.is_whole_hw() {
                             self.download_hw(src_rpat.hw, dst)?;
                         } else {
                             let src_metas = self.fetch_nonempty_file_list(src_rpat)?;
@@ -360,7 +360,7 @@ impl GscClient {
             }
         }
 
-        if dst.pat.is_empty() {
+        if dst.is_whole_hw() {
             for src in srcs {
                 let filename     = match self.get_base_filename(&src) {
                     Ok(s)  => s,
@@ -453,7 +453,7 @@ impl GscClient {
             self.try_warn(|| {
                 let files = self.fetch_nonempty_file_list(&rpat)?;
 
-                if rpat.pat.is_empty() {
+                if rpat.is_whole_hw() {
                     let mut table   = table::TextTable::new("%r  %l");
                     let mut line_no = 0;
 
