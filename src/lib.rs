@@ -483,21 +483,35 @@ impl GscClient {
         Ok(())
     }
 
-    pub fn ls(&self, rpat: &RemotePattern) -> Result<()> {
+    pub fn ls(&self, rpats: &[RemotePattern]) -> Result<()> {
+        for rpat in rpats {
+            self.try_warn(|| {
+                let files = self.fetch_nonempty_file_list(&rpat)?;
 
-        let mut table = table::TextTable::new("%r  %l  [%l] %l\n");
-        let files     = self.fetch_nonempty_file_list(&rpat)?;
+                if rpats.len() > 1 {
+                    if rpat.pat.is_empty() {
+                        v1!("{}", rpat);
+                    } else {
+                        v1!("{}:", rpat);
+                    }
+                }
 
-        for file in &files {
-            table.add_row(
-                table::Row::new()
-                    .add_cell(file.byte_count.separate_with_commas())
-                    .add_cell(&file.upload_time)
-                    .add_cell(file.purpose.to_char())
-                    .add_cell(&file.name));
+                let mut table = table::TextTable::new("%r  %l  [%l] %l\n");
+
+                for file in &files {
+                    table.add_row(
+                        table::Row::new()
+                            .add_cell(file.byte_count.separate_with_commas())
+                            .add_cell(&file.upload_time)
+                            .add_cell(file.purpose.to_char())
+                            .add_cell(&file.name));
+                }
+
+                v1!("{}", table);
+
+                Ok(())
+            });
         }
-
-        v1!("{}", table);
 
         Ok(())
     }
@@ -707,7 +721,7 @@ impl GscClient {
         let result = self.fetch_file_list(rpat)?;
 
         if result.is_empty() {
-            Err(ErrorKind::NoSuchRemoteFile(rpat.clone()))?;
+            Err(ErrorKind::NoSuchRemoteFile(rpat.clone()))?
         } else {
             Ok(result)
         }

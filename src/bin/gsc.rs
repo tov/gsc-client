@@ -41,7 +41,7 @@ enum Command {
     Create{user: String},
     Cp{srcs: Vec<CpArg>, dst: CpArg},
     Deauth,
-    Ls{rpat: RemotePattern},
+    Ls{rpats: Vec<RemotePattern>},
     Partner,
     PartnerRequest{hw: usize, them: String},
     PartnerAccept{hw: usize, them: String},
@@ -75,7 +75,7 @@ fn do_it() -> Result<bool> {
         Create{user}                 => client.create(&user),
         Cp{srcs, dst}                => client.cp(&srcs, &dst),
         Deauth                       => client.deauth(),
-        Ls{rpat}                     => client.ls(&rpat),
+        Ls{rpats}                    => client.ls(&rpats),
         Partner                      => client.partner(),
         PartnerRequest{hw, them}     => client.partner_request(hw, &them),
         PartnerAccept{hw, them}      => client.partner_accept(hw, &them),
@@ -137,7 +137,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             .subcommand(SubCommand::with_name("ls")
                 .about("Lists files")
                 .add_common()
-                .req_arg("SPEC", "The homework or file(s) to list, e.g. ‘hw3’"))
+                .req_args("SPEC", "The homework(s) or file(s) to list, e.g. ‘hw3’"))
             .subcommand(SubCommand::with_name("partner")
                 .about("Manages partners")
                 .add_common()
@@ -272,9 +272,15 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
 
         else if let Some(submatches) = matches.subcommand_matches("ls") {
             process_common(submatches, config);
-            let ls_spec   = submatches.value_of("SPEC").unwrap();
-            let rpat      = parse_hw_opt_file(ls_spec)?;
-            Ok(Command::Ls{rpat})
+            
+            let ls_specs   = submatches.values_of("SPEC").unwrap();
+            let mut rpats = Vec::new();
+
+            for ls_spec in ls_specs {
+                rpats.push(parse_hw_opt_file(ls_spec)?);
+            }
+
+            Ok(Command::Ls{rpats})
         }
 
         else if let Some(submatches) = matches.subcommand_matches("partner") {
