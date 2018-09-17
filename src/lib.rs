@@ -179,7 +179,7 @@ impl GscClient {
         let mut result  = self.send_request(request)?;
         let submissions: Vec<messages::SubmissionShort> = result.json()?;
 
-        let mut table = table::TextTable::new(" %r  %l  %l\n");
+        let mut table = table::TextTable::new(" %r  %l  %l");
 
         for submission in &submissions {
             table.add_row(table::Row::new()
@@ -448,16 +448,44 @@ impl GscClient {
         Ok(())
     }
 
-    pub fn cat(&self, pats: &[RemotePattern]) -> Result<()> {
-        for rpat in pats {
+    pub fn cat(&self, rpats: &[RemotePattern]) -> Result<()> {
+        for rpat in rpats {
             self.try_warn(|| {
                 let files = self.fetch_nonempty_file_list(&rpat)?;
 
-                for file in files {
-                    let uri          = format!("{}{}", self.config.get_endpoint(), file.uri);
-                    let request      = self.http.get(&uri);
-                    let mut response = self.send_request(request)?;
-                    response.copy_to(&mut std::io::stdout())?;
+                if rpat.pat.is_empty() {
+                    let mut table   = table::TextTable::new("%r  %l");
+                    let mut line_no = 0;
+
+                    for file in files {
+                        if file.purpose == messages::FilePurpose::Resource { continue; }
+
+                        let uri          = format!("{}{}", self.config.get_endpoint(), file.uri);
+                        let request      = self.http.get(&uri);
+                        let mut response = self.send_request(request)?;
+                        let contents     = response.text()?;
+
+                        table.add_heading(format!("hw{}:{}:\n", rpat.hw, file.name));
+
+                        for line in contents.lines() {
+                            line_no += 1;
+                            table.add_row(table::Row::new()
+                                .add_cell(line_no)
+                                .add_cell(line.trim_right()));
+                        }
+
+                        table.add_heading(String::new());
+                    }
+
+                    print!("{}", table);
+
+                } else {
+                    for file in files {
+                        let uri          = format!("{}{}", self.config.get_endpoint(), file.uri);
+                        let request      = self.http.get(&uri);
+                        let mut response = self.send_request(request)?;
+                        response.copy_to(&mut std::io::stdout())?;
+                    }
                 }
 
                 Ok(())
@@ -489,14 +517,10 @@ impl GscClient {
                 let files = self.fetch_nonempty_file_list(&rpat)?;
 
                 if rpats.len() > 1 {
-                    if rpat.pat.is_empty() {
-                        v1!("{}", rpat);
-                    } else {
-                        v1!("{}:", rpat);
-                    }
+                    v1!("{}:", rpat);
                 }
 
-                let mut table = table::TextTable::new("%r  %l  [%l] %l\n");
+                let mut table = table::TextTable::new("%r  %l  [%l] %l");
 
                 for file in &files {
                     table.add_row(
@@ -604,7 +628,7 @@ impl GscClient {
         let in_evaluation   = submission.status.is_self_eval();
         let quota_remaining = submission.quota_remaining();
 
-        let mut table = table::TextTable::new("  %l  %l\n");
+        let mut table = table::TextTable::new("  %l  %l");
         table.add_row(table::Row::new().add_cell("Submission status:")
             .add_cell(submission.status));
 
@@ -651,7 +675,7 @@ impl GscClient {
         v1!("Status for {}:\n", user.name);
 
         if user.submissions.iter().any(|s| s.status != messages::SubmissionStatus::Future) {
-            let mut table = table::TextTable::new("    hw%l: %r    %l\n");
+            let mut table = table::TextTable::new("    hw%l: %r    %l");
 
             for s in &user.submissions {
                 let grade = match s.status {
@@ -670,7 +694,7 @@ impl GscClient {
         }
 
         if !user.exam_grades.is_empty() {
-            let mut table = table::TextTable::new("    ex%l: %r%%    (%l / %l)\n");
+            let mut table = table::TextTable::new("    ex%l: %r%%    (%l / %l)");
 
             for e in &user.exam_grades {
                 let grade = format!("{:.1}", 100.0 * e.points as f64 / e.possible as f64);
@@ -829,7 +853,7 @@ impl GscClient {
         if user.partner_requests.is_empty() {
             ve1!("No outstanding partner requests.");
         } else {
-            let mut table = table::TextTable::new("    %l %l\n");
+            let mut table = table::TextTable::new("    %l %l");
 
             for p in &user.partner_requests {
                 use self::messages::PartnerRequestStatus::*;

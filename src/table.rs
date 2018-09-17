@@ -67,10 +67,15 @@ fn parse_format_string(spec: &str) -> (Vec<FormatSpec>, usize) {
     (vec, count)
 }
 
+enum InternalRow {
+    Cells(Vec<String>),
+    Heading(String),
+}
+
 pub struct TextTable {
     n_columns:     usize,
     format:        Vec<FormatSpec>,
-    rows:          Vec<Row>,
+    rows:          Vec<InternalRow>,
     column_widths: Vec<usize>,
 }
 
@@ -85,14 +90,21 @@ impl TextTable {
         }
     }
 
-    pub fn add_row(&mut self, row: Row) -> &mut Self {
-        assert_eq!(row.0.len(), self.n_columns);
+    pub fn add_heading(&mut self, heading: String) -> &mut Self {
+        self.rows.push(InternalRow::Heading(heading));
+        self
+    }
 
-        for (width, s) in self.column_widths.iter_mut().zip(row.0.iter()) {
+    pub fn add_row(&mut self, row: Row) -> &mut Self {
+        let cells = row.0;
+
+        assert_eq!(cells.len(), self.n_columns);
+
+        for (width, s) in self.column_widths.iter_mut().zip(cells.iter()) {
             *width = std::cmp::max(*width, s.len());
         }
 
-        self.rows.push(row);
+        self.rows.push(InternalRow::Cells(cells));
         self
     }
 }
@@ -102,41 +114,58 @@ impl Display for TextTable {
         use self::FormatSpec::*;
 
         for row in &self.rows {
-            let mut fs_iter = self.format.iter();
-            let mut cw_iter = self.column_widths.iter().cloned();
-            let mut v_iter  = row.0.iter();
+            match row {
+                InternalRow::Cells(cells) => {
+                    let mut cw_iter = self.column_widths.iter().cloned();
+                    let mut v_iter  = cells.iter();
 
-            while let Some(fs) = fs_iter.next() {
-                match fs {
-                    Left  => {
-                        let cw = cw_iter.next().unwrap();
-                        let v = match v_iter.next() {
-                            Some(v) => v.to_owned(),
-                            None    => "".to_owned(),
-                        };
-                        let len = cw - v.len();
-                        f.write_str(&v)?;
-                        for _ in 0 .. len {
-                            f.write_str(" ")?;
+                    for field in 0 .. self.format.len() {
+                        let fs = &self.format[field];
+
+                        match fs {
+                            Left  => {
+                                let cw = cw_iter.next().unwrap();
+                                let v = match v_iter.next() {
+                                    Some(v) => v.to_owned(),
+                                    None    => "".to_owned(),
+                                };
+
+                                f.write_str(&v)?;
+
+                                if field + 1 < self.format.len() {
+                                    let len = cw - v.len();
+                                    for _ in 0 .. len {
+                                        f.write_str(" ")?;
+                                    }
+                                }
+                            }
+
+                            Right => {
+                                let cw = cw_iter.next().unwrap();
+                                let v = match v_iter.next() {
+                                    Some(v) => v.to_owned(),
+                                    None    => "".to_owned(),
+                                };
+
+                                let len = cw - v.len();
+                                for _ in 0 .. len {
+                                    f.write_str(" ")?;
+                                }
+
+                                f.write_str(&v)?;
+                            }
+
+                            Literal(s) => f.write_str(&s)?,
                         }
                     }
+                }
 
-                    Right => {
-                        let cw = cw_iter.next().unwrap();
-                        let v = match v_iter.next() {
-                            Some(v) => v.to_owned(),
-                            None    => "".to_owned(),
-                        };
-                        let len = cw - v.len();
-                        for _ in 0 .. len {
-                            f.write_str(" ")?;
-                        }
-                        f.write_str(&v)?;
-                    }
-
-                    Literal(s) => f.write_str(&s)?,
+                InternalRow::Heading(s) => {
+                    f.write_str(s)?;
                 }
             }
+
+            f.write_str("\n")?;
         }
 
         Ok(())

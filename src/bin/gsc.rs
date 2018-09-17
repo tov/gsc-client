@@ -120,13 +120,14 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             .subcommand(SubCommand::with_name("cat")
                 .about("Prints remote files to stdout")
                 .add_common()
-                .req_arg("FILE", "The remote files to print"))
+                .flag("ALL", "all", "Print all files in the specified homeworks")
+                .req_args("SPEC", "The remote files or homeworks to print"))
             .subcommand(SubCommand::with_name("cp")
                 .about("Copies files to or from the server")
                 .add_common()
-                .flag("ALL", "all", "Copy all the files in the specified source homework(s)")
-                .req_args("SRC", "The file(s) to copy")
-                .req_arg("DST", "The destination of the file(s)"))
+                .flag("ALL", "all", "Copy all the files in the specified source homeworks")
+                .req_args("SRC", "The files to copy")
+                .req_arg("DST", "The destination of the files"))
             .subcommand(SubCommand::with_name("create")
                 .about("Creates a new account")
                 .add_common()
@@ -137,7 +138,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             .subcommand(SubCommand::with_name("ls")
                 .about("Lists files")
                 .add_common()
-                .req_args("SPEC", "The homework(s) or file(s) to list, e.g. ‘hw3’"))
+                .req_args("SPEC", "The homeworks or files to list, e.g. ‘hw3’"))
             .subcommand(SubCommand::with_name("partner")
                 .about("Manages partners")
                 .add_common()
@@ -157,7 +158,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 .about("Removes remote files")
                 .add_common()
                 .flag("ALL", "all", "Remove all the files in the specified homework")
-                .req_args("FILE", "The remote files to remove"))
+                .req_args("SPEC", "The remote files or homeworks to remove"))
             .subcommand(SubCommand::with_name("status")
                 .about("Retrieves user or submission status")
                 .add_common()
@@ -225,13 +226,15 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
 
         else if let Some(submatches) = matches.subcommand_matches("cat") {
             process_common(submatches, config);
+            let all = submatches.is_present("ALL");
+
             let mut rpats = Vec::new();
 
-            for arg in submatches.values_of("FILE").unwrap() {
+            for arg in submatches.values_of("SPEC").unwrap() {
                 let rpat = parse_hw_file(arg)?;
 
-                if rpat.is_whole_hw() {
-                    Err(ErrorKind::CannotCatWholeHomework)?;
+                if rpat.is_whole_hw() && !all {
+                    Err(ErrorKind::CommandRequiresFlag("cat".to_owned()))?;
                 }
 
                 rpats.push(rpat);
@@ -317,7 +320,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             let all       = submatches.is_present("ALL");
             let mut rpats = Vec::new();
 
-            for arg in submatches.values_of("FILE").unwrap() {
+            for arg in submatches.values_of("SPEC").unwrap() {
                 let rpat = parse_hw_file(arg)?;
 
                 if rpat.is_whole_hw() && !all {
