@@ -6,7 +6,7 @@ use thousands::Separable;
 
 use std::cell::{Cell, RefCell};
 use std::collections::{hash_map, HashMap};
-use std::io;
+use std::io::{self, BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
 pub mod cookie;
@@ -462,13 +462,15 @@ impl GscClient {
 
                         let uri          = format!("{}{}", self.config.get_endpoint(), file.uri);
                         let request      = self.http.get(&uri);
-                        let mut response = self.send_request(request)?;
-                        let contents     = response.text()?;
+                        let response     = self.send_request(request)?;
+                        let contents     = BufReader::new(response);
 
                         table.add_heading(format!("hw{}:{}:\n", rpat.hw, file.name));
 
-                        for line in contents.lines() {
+                        for line_result in contents.lines() {
                             line_no += 1;
+                            let line = line_result
+                                .unwrap_or_else(|e| format!("<error: {}>", e));
                             table.add_row(table::Row::new()
                                 .add_cell(line_no)
                                 .add_cell(line.trim_right()));

@@ -231,7 +231,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             let mut rpats = Vec::new();
 
             for arg in submatches.values_of("SPEC").unwrap() {
-                let rpat = parse_hw_file(arg)?;
+                let rpat = parse_hw_opt_file(arg)?;
 
                 if rpat.is_whole_hw() && !all {
                     Err(ErrorKind::CommandRequiresFlag("cat".to_owned()))?;
@@ -321,7 +321,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             let mut rpats = Vec::new();
 
             for arg in submatches.values_of("SPEC").unwrap() {
-                let rpat = parse_hw_file(arg)?;
+                let rpat = parse_hw_opt_file(arg)?;
 
                 if rpat.is_whole_hw() && !all {
                     Err(ErrorKind::CommandRequiresFlag("rm".to_owned()))?;
