@@ -292,17 +292,21 @@ impl GscClient {
 
             DstType::Dir => {
                 for src_rpat in src_rpats {
-                    if src_rpat.pat.is_empty() {
-                        self.download_hw(src_rpat.hw, dst)?;
-                    } else {
-                        let src_metas = self.fetch_nonempty_file_list(src_rpat)?;
+                    self.try_warn(|| {
+                        if src_rpat.pat.is_empty() {
+                            self.download_hw(src_rpat.hw, dst)?;
+                        } else {
+                            let src_metas = self.fetch_nonempty_file_list(src_rpat)?;
 
-                        for src_meta in src_metas {
-                            let mut file_dst = dst.to_owned();
-                            file_dst.push(&src_meta.name);
-                            self.download_file(src_rpat.hw, &src_meta, &file_dst)?;
+                            for src_meta in src_metas {
+                                let mut file_dst = dst.to_owned();
+                                file_dst.push(&src_meta.name);
+                                self.download_file(src_rpat.hw, &src_meta, &file_dst)?;
+                            }
                         }
-                    }
+
+                        Ok(())
+                    });
                 }
             }
         }
@@ -361,8 +365,7 @@ impl GscClient {
                 let filename     = match self.get_base_filename(&src) {
                     Ok(s)  => s,
                     Err(e) => {
-                        ve1!("{}", e);
-                        self.had_warning.set(true);
+                        self.warn(e);
                         continue;
                     }
                 };
@@ -436,10 +439,7 @@ impl GscClient {
 
         match result {
             Ok(msg)  => v2!("{}", msg),
-            Err(msg) => {
-                ve1!("{}\nDeleting local credentials anyway.", msg);
-                self.had_warning.set(true);
-            }
+            Err(msg) => self.warn(format!("{}\nDeleting local credentials anyway.", msg)),
         }
 
         let mut cookie = CookieFile::new(self.config.get_cookie_file()?, "")?;
@@ -450,14 +450,18 @@ impl GscClient {
 
     pub fn cat(&self, pats: &[RemotePattern]) -> Result<()> {
         for rpat in pats {
-            let files = self.fetch_nonempty_file_list(&rpat)?;
+            self.try_warn(|| {
+                let files = self.fetch_nonempty_file_list(&rpat)?;
 
-            for file in files {
-                let uri          = format!("{}{}", self.config.get_endpoint(), file.uri);
-                let request      = self.http.get(&uri);
-                let mut response = self.send_request(request)?;
-                response.copy_to(&mut std::io::stdout())?;
-            }
+                for file in files {
+                    let uri          = format!("{}{}", self.config.get_endpoint(), file.uri);
+                    let request      = self.http.get(&uri);
+                    let mut response = self.send_request(request)?;
+                    response.copy_to(&mut std::io::stdout())?;
+                }
+
+                Ok(())
+            })
         }
 
         Ok(())
@@ -557,20 +561,18 @@ impl GscClient {
 
     pub fn rm(&self, pats: &[RemotePattern]) -> Result<()> {
         for rpat in pats {
-            let files = self.fetch_file_list(&rpat)?;
+            self.try_warn(|| {
+                let files = self.fetch_nonempty_file_list(&rpat)?;
 
-            if files.is_empty() {
-                let error = Error::from(ErrorKind::NoSuchRemoteFile(rpat.clone()));
-                ve1!("{}", error);
-                self.had_warning.set(true);
-            }
+                for file in files {
+                    let uri          = format!("{}{}", self.config.get_endpoint(), file.uri);
+                    let request      = self.http.delete(&uri);
+                    v2!("Deleting remote file ‘hw{}:{}’...", rpat.hw, file.name);
+                    self.send_request(request)?;
+                }
 
-            for file in files {
-                let uri          = format!("{}{}", self.config.get_endpoint(), file.uri);
-                let request      = self.http.delete(&uri);
-                v2!("Deleting remote file ‘hw{}:{}’...", rpat.hw, file.name);
-                self.send_request(request)?;
-            }
+                Ok(())
+            });
         }
 
         v2!("Done.");
@@ -705,12 +707,10 @@ impl GscClient {
         let result = self.fetch_file_list(rpat)?;
 
         if result.is_empty() {
-            let warning = Error::from(ErrorKind::NoSuchRemoteFile(rpat.clone()));
-            ve1!("{}", warning);
-            self.had_warning.set(true);
+            Err(ErrorKind::NoSuchRemoteFile(rpat.clone()))?;
+        } else {
+            Ok(result)
         }
-
-        Ok(result)
     }
 
     fn fetch_one_filename(&self, rpat: &RemotePattern) -> Result<messages::FileMeta>
@@ -786,6 +786,21 @@ impl GscClient {
         }
     }
 
+    fn load_cookie_file(&self) -> Result<CookieFile> {
+        CookieFile::lock(self.config.get_cookie_file()?)
+    }
+
+    fn load_credentials(&self) -> Result<(String, CookieFile)> {
+        let cookie_file = self.load_cookie_file()?;
+
+        let user        = match self.config.get_on_behalf() {
+            Some(s) => s,
+            None    => cookie_file.get_username()
+        }.to_owned();
+
+        Ok((user, cookie_file))
+    }
+
     fn prepare_cookie(&self, request: &mut reqwest::RequestBuilder,
                       cookie_lock: &CookieFile)
         -> Result<()>
@@ -828,16 +843,9 @@ impl GscClient {
     fn print_results_helper(&self, results: &[messages::JsonResult]) {
         for result in results {
             match result {
-                messages::JsonResult::Success(msg) => {
-                    v2!("{}", msg);
-                }
-                messages::JsonResult::Failure(msg) => {
-                    ve1!("{}", msg);
-                    self.had_warning.set(true);
-                }
-                messages::JsonResult::Nested(vec) => {
-                    self.print_results_helper(&vec);
-                }
+                messages::JsonResult::Success(msg) => v2!("{}", msg),
+                messages::JsonResult::Failure(msg) => self.warn(msg),
+                messages::JsonResult::Nested(vec) =>  self.print_results_helper(&vec),
             }
         }
     }
@@ -859,21 +867,6 @@ impl GscClient {
         Ok(())
     }
 
-    fn load_cookie_file(&self) -> Result<CookieFile> {
-        CookieFile::lock(self.config.get_cookie_file()?)
-    }
-
-    fn load_credentials(&self) -> Result<(String, CookieFile)> {
-        let cookie_file = self.load_cookie_file()?;
-
-        let user        = match self.config.get_on_behalf() {
-            Some(s) => s,
-            None    => cookie_file.get_username()
-        }.to_owned();
-
-        Ok((user, cookie_file))
-    }
-
     fn send_request(&self, req_builder: reqwest::RequestBuilder)
         -> Result<reqwest::Response> {
 
@@ -891,6 +884,21 @@ impl GscClient {
         let mut response = self.http.execute(request)?;
         self.handle_response(&mut response, cookie)?;
         Ok(response)
+    }
+
+    fn try_warn<F, R>(&self, f: F) -> R
+        where F: FnOnce() -> Result<R>,
+              R: Default {
+
+        f().unwrap_or_else(|error| {
+            self.warn(error);
+            R::default()
+        })
+    }
+
+    fn warn<T: std::fmt::Display>(&self, msg: T) {
+        ve1!("{}", msg);
+        self.had_warning.set(true);
     }
 }
 

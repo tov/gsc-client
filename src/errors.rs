@@ -38,7 +38,7 @@ error_chain! {
 
         UnknownHomework(number: usize) {
             description("unknown homework")
-            display("Homework hw{} does not exist", number)
+            display("Homework hw{} does not exist.", number)
         }
 
         SyntaxError(class: String, thing: String) {
@@ -48,7 +48,7 @@ error_chain! {
 
         PasswordMismatch {
             description("password mismatch")
-            display("Passwords do not match")
+            display("Passwords do not match.")
         }
 
         NoCommandGiven {
