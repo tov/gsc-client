@@ -125,7 +125,14 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             .subcommand(SubCommand::with_name("cp")
                 .about("Copies files to or from the server")
                 .add_common()
-                .flag("ALL", "all", "Copy all the files in the specified source homeworks")
+                .flag("ALL",    "all", "Copy all the files in the specified source homeworks")
+                .flag("ALWAYS", "f",   "Overwrite existing files without asking")
+                .flag("ASK",    "i",   "Ask before overwriting existing files")
+                .flag("NEVER",  "n",   "Never overwrite existing files")
+                .group(ArgGroup::with_name("overwrite")
+                    .args(&["ALWAYS", "ASK", "NEVER"])
+                    .multiple(false)
+                    .required(false))
                 .req_args("SRC", "The files to copy")
                 .req_arg("DST", "The destination of the files"))
             .subcommand(SubCommand::with_name("create")
@@ -251,9 +258,18 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
 
         else if let Some(submatches) = matches.subcommand_matches("cp") {
             process_common(submatches, config);
-            let all      = submatches.is_present("ALL");
-            let mut srcs = Vec::new();
-            let dst      = parse_cp_arg(submatches.value_of("DST").unwrap())?;
+            let all       = submatches.is_present("ALL");
+
+            config.set_overwrite_policy(if submatches.is_present("ALWAYS") {
+                config::OverwritePolicy::Always
+            } else if submatches.is_present("NEVER") {
+                config::OverwritePolicy::Never
+            } else {
+                config::OverwritePolicy::Ask
+            });
+
+            let mut srcs  = Vec::new();
+            let dst       = parse_cp_arg(submatches.value_of("DST").unwrap())?;
 
             for src in submatches.values_of("SRC").unwrap() {
                 let arg = parse_cp_arg(src)?;
@@ -482,12 +498,18 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
     }
 
     fn flag(self, name: &'static str, long: &'static str, help: &'static str) -> Self {
-        self.arg(clap::Arg::with_name(name)
-            .long(long)
+        let mut arg = clap::Arg::with_name(name)
             .short(&long[..1])
             .help(help)
             .takes_value(false)
-            .required(false))
+            .required(false)
+            .multiple(true);
+
+        if long.len() > 1 {
+            arg = arg.long(long);
+        }
+
+        self.arg(arg)
     }
 }
 
