@@ -21,7 +21,15 @@ pub struct Config {
     dotfile:     Option<PathBuf>,
     endpoint:    String,
     on_behalf:   Option<String>,
+    overwrite:   OverwritePolicy,
     verbosity:   isize,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum OverwritePolicy {
+    Always,
+    Never,
+    Ask,
 }
 
 /// This is the format of the dotfile.
@@ -58,6 +66,7 @@ impl Config {
             dotfile,
             endpoint:    API_ENDPOINT.to_owned(),
             on_behalf:   None,
+            overwrite:   OverwritePolicy::Ask,
             verbosity:   1,
         }
     }
@@ -68,6 +77,14 @@ impl Config {
 
     pub fn set_on_behalf(&mut self, username: String) {
         self.on_behalf = Some(username);
+    }
+
+    pub fn get_overwrite_policy(&self) -> OverwritePolicy {
+        self.overwrite
+    }
+
+    pub fn set_overwrite_policy(&mut self, op: OverwritePolicy) {
+        self.overwrite = op;
     }
 
     pub fn get_verbosity(&self) -> isize {

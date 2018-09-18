@@ -13,7 +13,6 @@ pub mod cookie;
 pub mod config;
 pub mod errors;
 pub mod messages;
-pub mod table;
 
 use self::errors::*;
 use self::cookie::*;
@@ -179,13 +178,13 @@ impl GscClient {
         let mut result  = self.send_request(request)?;
         let submissions: Vec<messages::SubmissionShort> = result.json()?;
 
-        let mut table = table::TextTable::new(" %r  %l  %l");
+        let mut table = tabular::Table::new(" {:>}  {:<}  {:<}");
 
         for submission in &submissions {
-            table.add_row(table::Row::new()
-                .add_cell(submission.id)
-                .add_cell(format!("{}{}", self.config.get_endpoint(), submission.uri))
-                .add_cell(submission.status));
+            table.add_row(tabular::Row::new()
+                .with_cell(submission.id)
+                .with_cell(format!("{}{}", self.config.get_endpoint(), submission.uri))
+                .with_cell(submission.status));
         }
 
         v1!("{}", table);
@@ -454,7 +453,7 @@ impl GscClient {
                 let files = self.fetch_nonempty_file_list(&rpat)?;
 
                 if rpat.is_whole_hw() {
-                    let mut table   = table::TextTable::new("%r  %l");
+                    let mut table   = tabular::Table::new("{:>}  {:<}");
                     let mut line_no = 0;
 
                     for file in files {
@@ -471,9 +470,9 @@ impl GscClient {
                             line_no += 1;
                             let line = line_result
                                 .unwrap_or_else(|e| format!("<error: {}>", e));
-                            table.add_row(table::Row::new()
-                                .add_cell(line_no)
-                                .add_cell(line.trim_right()));
+                            table.add_row(tabular::Row::new()
+                                .with_cell(line_no)
+                                .with_cell(line.trim_right()));
                         }
 
                         table.add_heading(String::new());
@@ -522,15 +521,15 @@ impl GscClient {
                     v1!("{}:", rpat);
                 }
 
-                let mut table = table::TextTable::new("%r  %l  [%l] %l");
+                let mut table = tabular::Table::new("{:>}  {:<}  [{:<}] {:<}");
 
                 for file in &files {
                     table.add_row(
-                        table::Row::new()
-                            .add_cell(file.byte_count.separate_with_commas())
-                            .add_cell(&file.upload_time)
-                            .add_cell(file.purpose.to_char())
-                            .add_cell(&file.name));
+                        tabular::Row::new()
+                            .with_cell(file.byte_count.separate_with_commas())
+                            .with_cell(&file.upload_time)
+                            .with_cell(file.purpose.to_char())
+                            .with_cell(&file.name));
                 }
 
                 v1!("{}", table);
@@ -630,26 +629,26 @@ impl GscClient {
         let in_evaluation   = submission.status.is_self_eval();
         let quota_remaining = submission.quota_remaining();
 
-        let mut table = table::TextTable::new("  %l  %l");
-        table.add_row(table::Row::new().add_cell("Submission status:")
-            .add_cell(submission.status));
+        let mut table = tabular::Table::new("  {:<}  {:<}");
+        table.add_row(tabular::Row::new().with_cell("Submission status:")
+            .with_cell(submission.status));
 
         if in_evaluation {
-            table.add_row(table::Row::new().add_cell("Evaluation status:")
-                .add_cell(submission.eval_status));
+            table.add_row(tabular::Row::new().with_cell("Evaluation status:")
+                .with_cell(submission.eval_status));
         }
 
         table
-            .add_row(table::Row::new().add_cell("Open date:")
-                .add_cell(submission.open_date))
-            .add_row(table::Row::new().add_cell("Submission due date:")
-                .add_cell(submission.due_date))
-            .add_row(table::Row::new().add_cell("Self-eval due date:")
-                .add_cell(submission.eval_date))
-            .add_row(table::Row::new().add_cell("Last modified:")
-                .add_cell(submission.last_modified))
-            .add_row(table::Row::new().add_cell("Quota remaining:")
-                .add_cell(format!("{:.1}% ({} of {} bytes used)",
+            .add_row(tabular::Row::new().with_cell("Open date:")
+                .with_cell(submission.open_date))
+            .add_row(tabular::Row::new().with_cell("Submission due date:")
+                .with_cell(submission.due_date))
+            .add_row(tabular::Row::new().with_cell("Self-eval due date:")
+                .with_cell(submission.eval_date))
+            .add_row(tabular::Row::new().with_cell("Last modified:")
+                .with_cell(submission.last_modified))
+            .add_row(tabular::Row::new().with_cell("Quota remaining:")
+                .with_cell(format!("{:.1}% ({} of {} bytes used)",
                                   quota_remaining,
                                   submission.bytes_used.separate_with_commas(),
                                   submission.bytes_quota.separate_with_commas())));
@@ -677,7 +676,7 @@ impl GscClient {
         v1!("Status for {}:\n", user.name);
 
         if user.submissions.iter().any(|s| s.status != messages::SubmissionStatus::Future) {
-            let mut table = table::TextTable::new("    hw%l: %r    %l");
+            let mut table = tabular::Table::new("    hw{:<}: {:>}    {:<}");
 
             for s in &user.submissions {
                 let grade = match s.status {
@@ -686,25 +685,25 @@ impl GscClient {
                     _ => String::new(),
                 };
 
-                table.add_row(table::Row::new()
-                    .add_cell(s.assignment_number)
-                    .add_cell(grade)
-                    .add_cell(s.status));
+                table.add_row(tabular::Row::new()
+                    .with_cell(s.assignment_number)
+                    .with_cell(grade)
+                    .with_cell(s.status));
             }
 
             v1!("  Submissions:\n{}", table);
         }
 
         if !user.exam_grades.is_empty() {
-            let mut table = table::TextTable::new("    ex%l: %r%%    (%l / %l)");
+            let mut table = tabular::Table::new("    ex{:<}: {:>}%    ({:<} / {:<})");
 
             for e in &user.exam_grades {
                 let grade = format!("{:.1}", 100.0 * e.points as f64 / e.possible as f64);
-                table.add_row(table::Row::new()
-                    .add_cell(e.number)
-                    .add_cell(grade)
-                    .add_cell(e.points)
-                    .add_cell(e.possible));
+                table.add_row(tabular::Row::new()
+                    .with_cell(e.number)
+                    .with_cell(grade)
+                    .with_cell(e.points)
+                    .with_cell(e.possible));
             }
 
             v1!("  Exam grades:\n{}", table);
@@ -855,7 +854,7 @@ impl GscClient {
         if user.partner_requests.is_empty() {
             ve1!("No outstanding partner requests.");
         } else {
-            let mut table = table::TextTable::new("    %l %l");
+            let mut table = tabular::Table::new("    {:<} {:<}");
 
             for p in &user.partner_requests {
                 use self::messages::PartnerRequestStatus::*;
@@ -865,9 +864,10 @@ impl GscClient {
                     Incoming => format!("received from {}", p.user),
                     _        => continue,
                 };
-                table.add_row(table::Row::new()
-                    .add_cell(hw)
-                    .add_cell(message));
+
+                table.add_row(tabular::Row::new()
+                    .with_cell(hw)
+                    .with_cell(message));
             }
 
             v1!("{}Partner requests:\n{}", indent, table);
