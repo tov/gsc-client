@@ -6,7 +6,7 @@ use thousands::Separable;
 
 use std::cell::{Cell, RefCell};
 use std::collections::{hash_map, HashMap};
-use std::io::{self, BufRead, BufReader};
+use std::io::{self, BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 
 pub mod cookie;
@@ -257,6 +257,8 @@ impl GscClient {
                 }
         };
 
+        let policy = &mut self.config.get_overwrite_policy();
+
         match dst_type {
             DstType::File => {
                 if src_rpats.len() != 1 {
@@ -269,7 +271,9 @@ impl GscClient {
                     Err(ErrorKind::SourceHwToDestinationFile(src_rpat.hw, dst.to_owned()))?;
                 } else {
                     let src_file = self.fetch_one_filename(src_rpat)?;
-                    self.download_file(src_rpat.hw, &src_file, dst)?;
+                    if self.is_okay_to_overwrite(policy, || dst.display())? {
+                        self.download_file(src_rpat.hw, &src_file, dst)?;
+                    }
                 }
             }
 
@@ -282,7 +286,7 @@ impl GscClient {
 
                 if src_rpat.is_whole_hw() {
                     soft_create_dir(dst)?;
-                    self.download_hw(src_rpat.hw, dst)?;
+                    self.download_hw(policy, src_rpat.hw, dst)?;
                 } else {
                     let src_file = self.fetch_one_filename(src_rpat)?;
                     self.download_file(src_rpat.hw, &src_file, dst)?;
@@ -293,14 +297,16 @@ impl GscClient {
                 for src_rpat in src_rpats {
                     self.try_warn(|| {
                         if src_rpat.is_whole_hw() {
-                            self.download_hw(src_rpat.hw, dst)?;
+                            self.download_hw(policy, src_rpat.hw, dst)?;
                         } else {
                             let src_metas = self.fetch_nonempty_file_list(src_rpat)?;
 
                             for src_meta in src_metas {
                                 let mut file_dst = dst.to_owned();
                                 file_dst.push(&src_meta.name);
-                                self.download_file(src_rpat.hw, &src_meta, &file_dst)?;
+                                if self.is_okay_to_write(policy, &file_dst)? {
+                                    self.download_file(src_rpat.hw, &src_meta, &file_dst)?;
+                                }
                             }
                         }
 
@@ -314,9 +320,7 @@ impl GscClient {
         Ok(())
     }
 
-    fn download_file(&self, hw: usize, meta: &messages::FileMeta, dst: &Path)
-        -> Result<()> {
-
+    fn download_file(&self, hw: usize, meta: &messages::FileMeta, dst: &Path) -> Result<()> {
         let mut file = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -332,7 +336,9 @@ impl GscClient {
         Ok(())
     }
 
-    fn download_hw(&self, hw: usize, dst: &Path) -> Result<()> {
+    fn download_hw(&self, policy: &mut config::OverwritePolicy, hw: usize, dst: &Path)
+        -> Result<()> {
+
         let rpat      = RemotePattern { hw, pat: String::new() };
         let src_metas = self.fetch_file_list(&rpat)?;
 
@@ -341,7 +347,9 @@ impl GscClient {
             file_dst.push(src_meta.purpose.to_dir());
             soft_create_dir(&file_dst)?;
             file_dst.push(&src_meta.name);
-            self.download_file(hw, &src_meta, &file_dst)?;
+            if self.is_okay_to_write(policy, &file_dst)? {
+                self.download_file(hw, &src_meta, &file_dst)?;
+            }
         }
 
         Ok(())
@@ -404,12 +412,67 @@ impl GscClient {
         Ok(())
     }
 
+
     fn get_base_filename<'a>(&self, path: &'a Path) -> Result<&'a str> {
         match path.file_name() {
             None         => Err(ErrorKind::BadLocalPath(path.to_owned()).into()),
             Some(os_str) => match os_str.to_str() {
                 None         => Err(ErrorKind::FilenameNotUtf8(path.to_owned()).into()),
                 Some(s)      => Ok(s),
+            }
+        }
+    }
+
+    fn is_okay_to_write(&self, policy: &mut config::OverwritePolicy, dst: &Path) -> Result<bool> {
+        if dst.exists() {
+            self.is_okay_to_overwrite(policy, || dst.display())
+        } else {
+            Ok(true)
+        }
+    }
+
+    fn is_okay_to_overwrite<D, F>(&self, policy: &mut config::OverwritePolicy, dst_thunk: F)
+        -> Result<bool>
+        where D: ::std::fmt::Display,
+              F: FnOnce() -> D {
+
+        use self::config::OverwritePolicy::*;
+
+        match *policy {
+            Always => Ok(true),
+            Never  => Err(ErrorKind::DestinationFileExists(dst_thunk().to_string()))?,
+            Ask    => {
+                let     stdin = io::stdin();
+                let mut input = stdin.lock();
+                let mut buf   = String::with_capacity(2);
+                let     dst   = dst_thunk();
+
+                loop {
+                    print!("File ‘{}’ already exists.\nOverwrite [Y/N/A/C]? ", dst);
+                    io::stdout().flush()?;
+
+                    input.read_line(&mut buf)?;
+
+                    match buf.chars().flat_map(char::to_lowercase).next() {
+                        Some('y') => return Ok(true),
+                        Some('n') => {
+                            v1!("Skipping ‘{}’.", dst);
+                            return Ok(false);
+                        },
+                        Some('a') => {
+                            *policy = Always;
+                            return Ok(true);
+                        }
+                        Some('c') => std::process::exit(0),
+                        _ => {
+                            ve1!("Did not understand response. Options are:");
+                            ve1!("   [Y]es, overwrite just this file");
+                            ve1!("   [N]o, do overwrite not overwrite this file");
+                            ve1!("   overwrite [A]ll files");
+                            ve1!("   [C]ancel operation and exit");
+                        }
+                    }
+                }
             }
         }
     }

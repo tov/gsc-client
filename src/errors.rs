@@ -117,6 +117,11 @@ error_chain! {
             description("no informational eval item")
             display("Could not find informational eval item to add score to.")
         }
+
+        DestinationFileExists(filename: String) {
+            description("destination file exists, and flag ‘-n’ was given")
+            display("Not overwriting destination file ‘{}’ (-n).", filename)
+        }
     }
 }
 

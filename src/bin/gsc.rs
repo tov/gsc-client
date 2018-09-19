@@ -127,7 +127,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 .add_common()
                 .flag("ALL",    "all", "Copy all the files in the specified source homeworks")
                 .flag("ALWAYS", "f",   "Overwrite existing files without asking")
-                .flag("ASK",    "i",   "Ask before overwriting existing files")
+                .flag("ASK",    "i",   "Ask (interactively) before overwriting existing files")
                 .flag("NEVER",  "n",   "Never overwrite existing files")
                 .group(ArgGroup::with_name("overwrite")
                     .args(&["ALWAYS", "ASK", "NEVER"])
