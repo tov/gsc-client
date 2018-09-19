@@ -453,10 +453,14 @@ impl GscClient {
 
                     input.read_line(&mut buf)?;
 
+                    if buf.is_empty() {
+                        std::process::exit(1);
+                    }
+
                     match buf.chars().flat_map(char::to_lowercase).next() {
                         Some('y') => return Ok(true),
                         Some('n') => {
-                            v1!("Skipping ‘{}’.", dst);
+                            v2!("Skipping ‘{}’.", dst);
                             return Ok(false);
                         },
                         Some('a') => {
@@ -465,11 +469,14 @@ impl GscClient {
                         }
                         Some('c') => std::process::exit(0),
                         _ => {
+                            ve1!("");
                             ve1!("Did not understand response. Options are:");
                             ve1!("   [Y]es, overwrite just this file");
-                            ve1!("   [N]o, do overwrite not overwrite this file");
+                            ve1!("   [N]o, do not overwrite this file");
                             ve1!("   overwrite [A]ll files");
                             ve1!("   [C]ancel operation and exit");
+                            ve1!("");
+                            buf.clear();
                         }
                     }
                 }
