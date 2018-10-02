@@ -7,7 +7,7 @@ use super::errors::*;
 use serde_derive::Deserialize;
 use serde_yaml;
 
-const API_ENDPOINT: &str = "http://localhost:9090";
+const API_ENDPOINT: &str = "https://stewie.cs.northwestern.edu";
 
 const COOKIEFILE_VAR: &str  = "GSC_LOGIN";
 const COOKIEFILE_NAME: &str = ".gsclogin";
