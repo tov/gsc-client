@@ -183,8 +183,8 @@ impl GscClient {
         for submission in &submissions {
             table.add_row(tabular::Row::new()
                 .with_cell(submission.id)
-                .with_cell(format!("{}{}", self.config.get_endpoint(), submission.uri))
-                .with_cell(submission.status));
+                .with_cell(&submission.owner1.name)
+                .with_cell(submission.owner2.as_ref().map(|o| o.name.as_str()).unwrap_or("")));
         }
 
         v1!("{}", table);
