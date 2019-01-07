@@ -21,6 +21,7 @@ error_chain! {
     foreign_links {
         Clap(clap::Error);
         Globset(globset::Error);
+        InvalidHeaderValue(reqwest::header::InvalidHeaderValue);
         Io(std::io::Error);
         ParseInt(std::num::ParseIntError);
         ParseFloat(std::num::ParseFloatError);

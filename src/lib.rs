@@ -73,8 +73,7 @@ impl GscClient {
         let uri         = self.get_uri_for_submission(username, hw, cookie)?;
         let mut message = messages::SubmissionChange::default();
         message.owner2  = Some(());
-        let mut request = self.http.patch(&uri);
-        request.json(&message);
+        let request     = self.http.patch(&uri).json(&message);
         let response    = self.send_request(request)?;
         self.print_results(response)
     }
@@ -90,8 +89,7 @@ impl GscClient {
         } else {
             message.due_date  = Some(datetime.to_owned());
         }
-        let mut request  = self.http.patch(&uri);
-        request.json(&message);
+        let request      = self.http.patch(&uri).json(&message);
         let response     = self.send_request(request)?;
         self.print_results(response)
     }
@@ -146,7 +144,7 @@ impl GscClient {
             explanation: comment.to_owned(),
             status:      messages::GraderEvalStatus::Ready,
         };
-        request.json(&message);
+        request          = request.json(&message);
         let mut response = self.send_request(request)?;
         let result: messages::GraderEval = response.json()?;
 
@@ -165,8 +163,7 @@ impl GscClient {
         message.exam_grades = vec![
             messages::ExamGrade { number, points, possible, }
         ];
-        let mut request = self.http.patch(&uri);
-        request.json(&message);
+        let request     = self.http.patch(&uri).json(&message);
         let response    = self.send_request(request)?;
         self.print_results(response)
     }
@@ -404,8 +401,7 @@ impl GscClient {
         let encoded_dst  = utf8_percent_encode(&dst.pat, ENCODE_SET);
         let base_uri     = self.get_uri_for_submission_files(dst.hw)?;
         let uri          = format!{"{}/{}", base_uri, encoded_dst};
-        let mut request  = self.http.put(&uri);
-        request.body(src_file);
+        let request      = self.http.put(&uri).body(src_file);
         v2!("Uploading ‘{}’ -> ‘{}’...", src.display(), dst);
         self.send_request(request)?;
 
@@ -650,8 +646,7 @@ impl GscClient {
             }
         ];
 
-        let mut request = self.http.patch(&uri);
-        request.json(&message);
+        let request     = self.http.patch(&uri).json(&message);
         let response    = self.send_request_with_cookie(request, cookie)?;
         self.print_results(response)
     }
@@ -662,8 +657,7 @@ impl GscClient {
         let mut message  = messages::UserChange::default();
         message.password = Some(password);
         let uri          = self.user_uri(&me);
-        let mut request  = self.http.patch(&uri);
-        request.json(&message);
+        let request      = self.http.patch(&uri).json(&message);
         let response     = self.send_request_with_cookie(request, cookie)?;
         self.print_results(response)
     }
@@ -910,14 +904,14 @@ impl GscClient {
         Ok((user, cookie_file))
     }
 
-    fn prepare_cookie(&self, request: &mut reqwest::RequestBuilder,
+    fn prepare_cookie(&self, mut request: reqwest::RequestBuilder,
                       cookie_lock: &CookieFile)
-        -> Result<()>
+        -> Result<reqwest::RequestBuilder>
     {
-        let cookie = cookie_lock.get_cookie_header();
-        ve3!("> Sending cookie {}", cookie);
-        request.header(cookie);
-        Ok(())
+        let cookie = cookie_lock.get_cookie_header()?;
+        ve3!("> Sending cookie {}", cookie.to_str().unwrap());
+        request = request.header(reqwest::header::COOKIE, cookie);
+        Ok(request)
     }
 
     fn print_partner_status(&self, user: &messages::User, indent: &str) {
@@ -967,10 +961,12 @@ impl GscClient {
     fn save_cookie(&self, response: &reqwest::Response, mut cookie_lock: CookieFile)
                    -> Result<()> {
 
-        if let Some(reqwest::header::SetCookie(chunks)) = response.headers().get() {
-            if let Some((key, value)) = parse_cookies(&chunks) {
-                ve3!("< Received cookie {}={}", key, value);
-                cookie_lock.set_cookie(key, value);
+        if let Some(cookie) = response.headers().get(reqwest::header::SET_COOKIE) {
+            if let Ok(cookie_text) = cookie.to_str() {
+                if let Some((key, value)) = parse_cookie(cookie_text) {
+                    ve3!("< Received cookie {}={}", key, value);
+                    cookie_lock.set_cookie(key, value);
+                }
             }
         }
 
@@ -988,7 +984,7 @@ impl GscClient {
                                 cookie: CookieFile)
         -> Result<reqwest::Response> {
 
-        self.prepare_cookie(&mut req_builder, &cookie)?;
+        req_builder = self.prepare_cookie(req_builder, &cookie)?;
         let request      = req_builder.build()?;
         ve3!("> Sending request to {}", request.url());
         let mut response = self.http.execute(request)?;
@@ -1043,16 +1039,6 @@ pub fn parse_cookie(cookie: &str) -> Option<(String, String)> {
         let value = pair[index + 1 ..].to_owned();
         (key, value)
     })
-}
-
-fn parse_cookies(chunks: &[String]) -> Option<(String, String)> {
-    for chunk in chunks {
-        if let Some(pair) = parse_cookie(&chunk) {
-            return Some(pair);
-        }
-    }
-
-    None
 }
 
 fn prompt_password(prompt: &str, username: &str) -> Result<String> {

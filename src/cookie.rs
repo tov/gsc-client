@@ -1,4 +1,5 @@
 use fs2::FileExt;
+use reqwest::header::HeaderValue;
 use vlog::*;
 use std::io::{BufRead, Seek, Write};
 use std::fs::File;
@@ -83,10 +84,9 @@ impl CookieFile {
         &self.username
     }
 
-    pub fn get_cookie_header(&self) -> reqwest::header::Cookie {
-        let mut header = reqwest::header::Cookie::new();
-        header.set(self.key.to_owned(), self.value.to_owned());
-        header
+    pub fn get_cookie_header(&self) -> Result<HeaderValue> {
+        let cookie = format!("{}={}", self.key, self.value);
+        Ok(HeaderValue::from_str(&cookie)?)
     }
 
     pub fn set_cookie(&mut self, key: String, value: String) {
