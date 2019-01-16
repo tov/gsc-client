@@ -41,13 +41,13 @@ gsc \- command-line client to the gsc homework server
 .\"
 .SH "SYNOPSIS"
 .SY gsc
-.RI [ OPTIONS... ] " SUBCOMMAND " [ ARGS... ]
+.RI [< OPTION "> " ... "] <" SUBCOMMAND "> [<" ARG "> " ... ]
 .PD 0
 .P
 .PD
 .SY gsc
 .B help
-.RI [ SUBCOMMAND ]
+.RI [< SUBCOMMAND >]
 .\"
 .SH "DESCRIPTION"
 .B gsc
@@ -66,44 +66,30 @@ Prints help information, then exits
 Prints version information, then exits
 .\"
 .SH "CONVENTIONS"
-.
-.
-.
-.TP
-\fBhw\fIN\fR
-Refers to Homework \fIN\fR. For example, \fBhw1\fR or \fBhw4\fR.
-.TP
-\fIDIR\fR
-A local directory, such as \fIsrc\fR or \fItest\fR.
-.
-.
-.
-.P
 To use
 .BR gsc ", "
-it is often necessary to refer to both local files
-in your shell and remote files that have been submitted to the server.
-In the documentation for various commands, the syntax for referring to
-files is known as a
-.IR SPEC \.
-.IR SPEC s
-take the following forms:
+it is necessary to refer to local files in your shell as well as remote
+files that have been submitted to the server. We use the following
+conventions when giving the syntax of the various subcommands:
 .TP
-\fIhello.c\fR
-Refers to a local file named \fIhello.c\fR.
+\fR<\fIFILE\fR>
+Refers to a local file in your shell account.
 .TP
-\fIhw2:hello.c\fR
-Refers to a remote file named \fIhello.c\fR that has been submitted as
-part of HW2.
+\fR<\fIDIR\fR>
+Refers to a local directory in your shell account.
 .TP
-\fIhw2:\fR
-Refers to the entire HW2 submission.
+\fBhw\fR<\fIN\fR>
+Refers to Homework \fR<\fIN\fR> on the gsc homework server.
+.TP
+\fBhw\fR<\fIN\fR>\fB:\fR<\fISPEC\fR>
+Refers to file(s) matching \fR<\fISPEC\fR> submitted to Homework \fR<\fIN\fR> on
+the gsc homework server.
 .PP
-\fISPEC\fRs may also contain wildcard patterns that match multiple
-files. In particular, ``\fI*\fR'' matches any number of characters, and
-``\fI?\fR'' matches exactly one character. Patterns in local \fISPEC\fRs
-are expanded by the shell, but wildcards in remote \fISPEC\fR need to be
-expanded by
+\fR<\fISPEC\fR>s may contain wildcard patterns that match multiple files on
+the server. In particular, ``\fI*\fR'' matches any number of characters,
+and ``\fI?\fR'' matches exactly one character. Patterns in local
+\fR<\fIFILE\fR>s are expanded by the shell, but wildcard patterns in remote
+\fR<\fISPEC\fR>s need to be expanded by
 .BR gsc ", "
 which means that they need to be quoted to prevent the shell from
 interpreting them. For example, to upload all \fI.c\fR files in local
@@ -115,31 +101,44 @@ directory \fIsrc/\fR, you would run
 .sh gsc cp 'hw5:*.c' src/
 .\"
 .SH "SUBCOMMANDS"
-.gsc auth \fIUSERNAME\fR
+.gsc auth \fR<\fIUSERNAME\fR>
 Authenticates with the homework server.
 .sss details
-Before you can authenticate, an account named \fIUSERNAME\fR must
+Before you can authenticate, an account named \fR<\fIUSERNAME\fR> must
 already exist. You can use \fBgsc create\fR to register an account.
 .PP
 After some period of time (14 days by default), your
 authentication will expire and you will need to run this command again.
 .sse
-.gsc cat \fR[\fB\-a\fR|\fB\-\-all\fR] \fBhw\fIN\fR[\fB:\fISPEC\fR] \fI...
-Prints the contents of the given \fIREMOTE_SPEC\fRs to the screen.
+.gsc cat \fR[\fB\-a\fR|\fB\-\-all\fR] \fBhw\fR<\fIN\fR>\fB:\fR[\fR<\fISPEC\fR>] \fI...
+Prints the contents of the specified remote files or homeworks to the
+screen.
 .sss options
 .option \-a ", " \-\-all
-Allows \fIREMOTE_SPEC\fRs to refer to whole homeworks; otherwise, they
-must be individual files or wildcards.
-.gsc cp \ \ \ \fR[\fI\fB\-f\fR|\fB\-i\fR|\fB\-n\fR]\fB \ \fISRC_FILE \ \ \ \ \ \fBhw\fIN\fB:\fISPEC\ \ \ \ \ \ \ \ \ \fB# \fR[1]
-.gsc cp \ \ \ \fR[\fI\fB\-f\fR|\fB\-i\fR|\fB\-n\fR]\fB \ \fISRC_FILE ... \ \fBhw\fIN\fB:\ \ \ \ \ \ \ \ \ \ \ \ \ \fB# \fR[2]
-.gsc cp \ \ \ \fR[\fI\fB\-f\fR|\fB\-i\fR|\fB\-n\fR]\fB \ \fBhw\fIN\fB:\fISPEC \ \ \ \ \ \fIDST_FILE\ \ \ \ \ \ \ \ \ \fB# \fR[3]
-.gsc cp \ \ \ \fR[\fI\fB\-f\fR|\fB\-i\fR|\fB\-n\fR]\fB \ \fBhw\fIN\fB:\fISPEC \fI... \ \fIDST_DIR\ \ \ \ \ \ \ \ \ \ \fB# \fR[4]
-.gsc cp \-a \fR[\fI\fB\-f\fR|\fB\-i\fR|\fB\-n\fR]\fB \ hw\fIN\fB: \ \ \ \ \ \ \ \ \ \fIDST_DIR\ \ \ \ \ \ \ \ \ \ \fB# \fR[5]
+Allows \fR<\fISPEC\fR> to be omitted in order to view a whole
+homeworks; otherwise, each \fR<\fISPEC\fR> must be an individual file or
+wildcard pattern.
+.sse
+.sss examples
+View the contents of the \fIMakefile\fRs uploaded to HW3:
+.sh gsc cat hw3:Makefile
+.PP
+View the contents of all \fI.h\fR files uploaded to HW3:
+.sh gsc cat 'hw3:*.h'
+.PP
+View the contents of all files uploaded to HW3:
+.sh gsc cat -a hw3
+.sse
+.gsc cp \ \ \ \fR[\fI\fB\-f\fR|\fB\-i\fR|\fB\-n\fR]\fB \ \fR<\fIFILE\fR> \ \ \ \ \ \ \ \ \ \ \ \fBhw\fR<\fIN\fR>\fB:\fR<\fISPEC\fR>\ \ \ \fB# \fR[1]
+.gsc cp \ \ \ \fR[\fI\fB\-f\fR|\fB\-i\fR|\fB\-n\fR]\fB \ \fR<\fIFILE\fR> \fI... \ \ \ \ \ \ \ \fBhw\fR<\fIN\fR>\fB:\ \ \ \ \ \ \ \ \ \fB# \fR[2]
+.gsc cp \ \ \ \fR[\fI\fB\-f\fR|\fB\-i\fR|\fB\-n\fR]\fB \ \fBhw\fR<\fIN\fR>\fB:\fR<\fISPEC\fR> \ \ \ \ \ \fR<\fIFILE\fR>\ \ \ \ \ \ \ \ \ \fB# \fR[3]
+.gsc cp \ \ \ \fR[\fI\fB\-f\fR|\fB\-i\fR|\fB\-n\fR]\fB \ \fBhw\fR<\fIN\fR>\fB:\fR<\fISPEC\fR> \fI... \ \fR<\fIDIR\fR>\ \ \ \ \ \ \ \ \ \ \fB# \fR[4]
+.gsc cp \-a \fR[\fI\fB\-f\fR|\fB\-i\fR|\fB\-n\fR]\fB \ hw\fR<\fIN\fR>\fB: \ \ \ \ \ \ \ \ \ \ \ \fR<\fIDIR\fR>\ \ \ \ \ \ \ \ \ \ \fB# \fR[5]
 Copies files from local to remote or remote to local.
 .sse
 .sss options
 .option \-a ", " \-\-all
-Allows \fISRC_SPEC\fR to refer to a whole local directory or
+Allows \fISPEC\fR to refer to a whole local directory or
 whole remote homework. Otherwise, sources must be individual files or
 wildcards.
 .option \-f
@@ -169,9 +168,9 @@ In the second form,
 .B "gsc cp"
 works like Unix
 .BR cp (1).
-In particular, if there is only one \fISRC_SPEC\fR, and if that one
-\fISRC_SPEC\fR names just one file (as opposed to being a directory or
-a wildcard that matches multiple files), then there are three
+In particular, if there is only one \fISPEC\fR, and if that one
+\fISPEC\fR names just one file (as opposed to being a directory or
+a wildcard pattern that matches multiple files), then there are three
 possibilities:
 .IP 1. 4
 If \fIDST_SPEC\fR does not exist then it is created.
@@ -223,10 +222,10 @@ Download all files from remote HW1, recreating the project
 structure in a local subdirectory named ``\fIfoobar\fR'':
 .sh gsc cp \-a hw1: foobar
 .sse
-.gsc create \fIUSERNAME\fR
+.gsc create \fR<\fIUSERNAME\fR>
 Creates a new account on the homework server.
 .sss details
-The name of the new account will be \fIUSERNAME\fR. This \fBMUST\fR
+The name of the new account will be \fR<\fIUSERNAME\fR>. This \fBMUST\fR
 be your Northwestern NetID (three or four letters followed by three
 digits), or you will not get credit for your submissions.
 .PP
@@ -239,14 +238,14 @@ involved.
 .sse
 .gsc deauth
 Logs you out from the homework server.
-.gsc help \fR[\fISUBCOMMAND\fR]
+.gsc help \fR[<\fISUBCOMMAND\fR>]
 Prints the help message for a particular subcommand.
-.gsc ls \fBhw\fIN\fR[\fB:\fISPEC\fR] \fI...
+.gsc ls \fBhw\fR<\fIN\fR>\fB:\fR[<\fISPEC\fR>] \fI...
 Lists files on the homework server.
 .sss details
 There may be one or more \fIREMOTE_SPEC\fRs, and each may be a
-whole homework, a single file, or a wildcard possibly matching multiple
-files.
+whole homework, a single file, or a wildcard pattern possibly matching
+multiple files.
 .PP
 The results are displayed in a table with four columns:
 .IP 1. 4
@@ -259,25 +258,25 @@ type (\fIs\fRource, \fIt\fRest, \fIc\fRonfig, \fIr\fResource, or
 .IP 4.
 name
 .sse
-.gsc partner \fIACTION\fR \fBhw\fIN\fR \fIUSERNAME\fR
+.gsc partner \fR<\fIACTION\fR> \fBhw\fR<\fIN\fR> \fR<\fIUSERNAME\fR>
 Creates, accepts, and cancels partner requests.
 .sss details
-The \fIN\fR in \fBhw\fIN\fR must be the number of a homework assignment
+The \fR<\fIN\fR> in \fBhw\fR<\fIN\fR> must be the number of a homework assignment
 that allows partners. To create or accept a request, you and your
-intended partner (given by \fIUSERNAME\fR) must not already have a
+intended partner (given by \fR<\fIUSERNAME\fR>) must not already have a
 partner for the specified homework.
 .PP
-The \fIACTION\fR must be one of:
+The \fR<\fIACTION\fR> must be one of:
 .TP 10
 \fBrequest\fR
-Creates a new request to partner with \fIUSERNAME\fR.
+Creates a new request to partner with \fR<\fIUSERNAME\fR>.
 .TP
 \fBaccept\fR
-Accepts an existing partner request that was created by \fIUSERNAME\fR.
+Accepts an existing partner request that was created by \fR<\fIUSERNAME\fR>.
 .TP
 \fBcancel\fR
 Cancels an existing partner request that was created by either you or
-\fIUSERNAME\fR.
+\fR<\fIUSERNAME\fR>.
 .PP
 To view outstanding partner requests, use the
 .B "gsc status"
@@ -296,24 +295,24 @@ evaluated based on the length and the number of different character
 classes (uppercase letter, lowercase letters, digits, and punctuation)
 involved.
 .sse
-.gsc rm \fR[\fB\-a\fR|\fB\-\-all\fR] \fBhw\fIN\fR[\fB:\fISPEC\fR] \fI...
+.gsc rm \fR[\fB\-a\fR|\fB\-\-all\fR] \fBhw\fR<\fIN\fR>\fB:\fR[\fR<\fISPEC\fR>] \fI...
 Deletes files on the homework server.
 .sss options
 .option \-a ", " \-\-all
-Allows \fISPEC\fRs to be blank, in order to delete whole homeworks;
-otherwise, each \fISPEC\fR must be non-empty.
+Allows \fR<\fISPEC\fR>s to be blank, in order to delete whole homeworks;
+otherwise, each \fR<\fISPEC\fR> must be non-empty.
 .sse
 .sss example
 Delete all \fI.log\fR files from HW1:
 .sh gsc rm 'hw1:*.log'
-.gsc status \fR[\fBhw\fIN\fB:\fR]
+.gsc status \fR[\fBhw\fR<\fIN\fR>]
 Prints general or homework-specific status information.
 .sse
 .sss details
 If no homework is specified then this subcommand prints a summary of
 homework grades and submission status, exam grades, and outstanding
 partner requests. If a particular homework is specified, then this
-subcommand prints more information specific to HW\fIN\fR.
+subcommand prints more information specific to HW\fR<\fIN\fR>.
 .sse
 .gsc whoami
 Prints the current authenticated username.
@@ -328,8 +327,8 @@ is set then it uses that; otherwise, it tries
 .IR $HOME/.gscrc .
 Supported configuration options include:
 .TP
-\fBverbosity: \fIN\fR
-\fIN\fR must be an integer from 0 to 4 (default 2). It specifies the
+\fBverbosity: \fR<\fIN\fR>
+\fR<\fIN\fR> must be an integer from 0 to 4 (default 2). It specifies the
 startinng verbosity level that is adjusted using the
 .BR \-q / \-\-quiet
 and
@@ -337,9 +336,10 @@ and
 flags.
 .PP
 .TP
-\fBendpoint: \fIURI\fR
-\fIURI\fR must point to an endpoint running the gsc homework server.
-This is probably only useful if you run your own gsc homework server.
+\fBendpoint: \fR<\fIURI\fR>
+\fR<\fIURI\fR> must point to an endpoint running the gsc homework
+server. This is probably only useful if you run your own gsc homework
+server.
 .PP
 Additionally, by default
 .B gsc
