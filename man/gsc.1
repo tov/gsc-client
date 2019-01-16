@@ -12,7 +12,7 @@
 ..
 .de sss
 .  PP
-.  I "\\$*"
+.  B "Subcommand \\$*"
 ..
 .\"
 .TH gsc 1
@@ -80,7 +80,7 @@ directory \fIsrc/\fR, you would run
 .SH "SUBCOMMANDS"
 .SS "gsc auth \fIUSERNAME\fR"
 Authenticates with the homework server.
-.sss Details
+.sss details
 .PP
 Before you can authenticate, an account named \fIUSERNAME\fR must
 already exist. You can use \fBgsc create\fR to register an account.
@@ -90,14 +90,14 @@ authentication will expire and you will need to run this command again.
 .PP
 .SS "gsc cat \fR[\fIOPTIONS...\fR] \fIREMOTE_SPEC...\fR"
 Prints the contents of the given \fIREMOTE_SPEC\fRs to the screen.
-.sss Options
+.sss options
 .option \-a ", " --all
 Allows \fIREMOTE_SPEC\fRs to refer to whole homeworks; otherwise, they
 must be individual files or wildcards.
 .SS "gsc cp -a \fR[\fIOPTIONS\fR...]\fB hw\fIN\fB:        \fIDST_SPEC\fR"
 .SS "gsc cp    \fR[\fIOPTIONS\fR...]\fB \fISRC_SPEC...\fR \fIDST_SPEC\fR"
 Copies files from local to remote or remote to local.
-.sss Options
+.sss options
 .option -a ", " --all
 Allows \fISRC_SPEC\fR to refer to a whole local directory or
 whole remote homework. Otherwise, sources must be individual files or
@@ -108,7 +108,7 @@ Forces overwriting existing local files without asking.
 Interactively asks before overwriting existing local files.
 .option -n
 Never overwrites existing local files.
-.sss Details
+.sss details
 .PP
 The
 .B "gsc cp"
@@ -149,7 +149,7 @@ By default,
 .B "gsc cp"
 prompts before overwriting local files when downloading, but this
 behavior can be overridden with the \fB\-f\fR or \fB\-n\fR option.
-.sss Examples
+.sss examples
 .PP
 Upload local file \fIcircle.c\fR to remote HW1:
 .sh gsc cp circle.c hw1:
@@ -184,7 +184,7 @@ structure in a local subdirectory named ``\fIfoobar\fR'':
 .sh gsc cp -a hw1: foobar
 .SS "gsc create \fIUSERNAME\fR"
 Creates a new account on the homework server.
-.sss Details
+.sss details
 .PP
 The name of the new account will be \fIUSERNAME\fR. This \fBMUST\fR
 be your Northwestern NetID (three or four letters followed by three
@@ -202,7 +202,7 @@ Logs you out from the homework server.
 Prints the help message for a particular subcommand.
 .SS "gsc ls \fIREMOTE_SPEC..."
 Lists files on the homework server.
-.sss Details
+.sss details
 .PP
 There may be one or more \fIREMOTE_SPEC\fRs, and each may be a
 whole homework, a single file, or a wildcard possibly matching multiple
@@ -220,7 +220,7 @@ type (\fIs\fRource, \fIt\fRest, \fIc\fRonfig, \fIr\fResource, or
 name
 .SS "gsc partner \fIACTION\fR \fBhw\fIN\fR \fIUSERNAME\fR"
 Creates, accepts, and cancels partner requests.
-.sss Details
+.sss details
 .PP
 The \fIN\fR in \fBhw\fIN\fR must be the number of a homework assignment
 that allows partners. To create or accept a request, you and your
@@ -244,7 +244,7 @@ To view outstanding partner requests, use the
 subcommand.
 .SS "gsc passwd"
 Changes your password.
-.sss Details
+.sss details
 .PP
 You must already be authenticated to change your password. If you don't
 know your password, contact course staff to have it reset.
@@ -257,17 +257,17 @@ classes (uppercase letter, lowercase letters, digits, and punctuation)
 involved.
 .SS "gsc rm \fR[\fIOPTIONS...\fR] \fIREMOTE_SPEC..."
 Deletes files on the homework server.
-.sss Options
+.sss options
 .option \-a ", " --all
 Allows \fIREMOTE_SPEC\fRs to refer to whole homeworks; otherwise, they
 must be individual files or wildcards.
-.sss Example
+.sss example
 .PP
 Delete all \fI.log\fR files from HW1:
 .sh gsc rm 'hw1:*.log'
 .SS "gsc status \fR[\fBhw\fIN\fB:\fR]"
 Prints general or homework-specific status information.
-.sss Details
+.sss details
 .PP
 If no homework is specified then this subcommand prints a summary of
 homework grades and submission status, exam grades, and outstanding
@@ -275,13 +275,6 @@ partner requests. If a particular homework is specified, then this
 subcommand prints more information specific to HW\fIN\fR.
 .SS "gsc whoami"
 Prints the current authenticated username.
-.\"
-.SH "AUTHOR"
-\fIjesse@eecs\.northwestern\.edu\fR
-.\"
-.SH "BUGS"
-\fIhttps://github\.com/tov/gsc\-client/issues\fR
-.\"
 .\"
 .SH "AUTHOR"
 \fIjesse@eecs\.northwestern\.edu\fR
