@@ -41,12 +41,13 @@ gsc \- command-line client to the gsc homework server
 .\"
 .SH "SYNOPSIS"
 .SY gsc
-.OP \-q
-.OP \-v
-.OP \-h
-.OP \-V
-.I SUBCOMMAND
-.RI [ ARGS... ]
+.RI [ OPTIONS... ] " SUBCOMMAND " [ ARGS... ]
+.PD 0
+.P
+.PD
+.SY gsc
+.B help
+.RI [ SUBCOMMAND ]
 .\"
 .SH "DESCRIPTION"
 .B gsc
@@ -56,13 +57,13 @@ managing partnerships, and changing your password.
 .\"
 .SH "OPTIONS"
 .option \-q ", " \-\-quiet
-Makes output quieter
+Makes output quieter (repeatable)
 .option \-v ", " \-\-verbose
-Makes output more verbose
+Makes output more verbose (repeatable)
 .option \-h ", " \-\-help
-Prints help information
+Prints help information, then exits
 .option \-V ", " \-\-version
-Prints version information
+Prints version information, then exits
 .\"
 .SH "CONVENTIONS"
 .
@@ -129,12 +130,11 @@ Prints the contents of the given \fIREMOTE_SPEC\fRs to the screen.
 .option \-a ", " \-\-all
 Allows \fIREMOTE_SPEC\fRs to refer to whole homeworks; otherwise, they
 must be individual files or wildcards.
-.gsc cp \-a \fR[\fIOPTIONS\fR...]\fB \ hw\fIN\fB: \ \  \  \  \  \fIDST_DIR\fR
-.gsc cp \ \  \fR[\fIOPTIONS\fR...]\fB \ \fBhw\fIN\fB:\fISPEC \fI... \ \fIDST_DIR\fR
-.gsc cp \ \  \fR[\fIOPTIONS\fR...]\fB \ \fBhw\fIN\fB:\fISPEC \  \  \ \fIDST_FILE\fR
-.gsc cp \-a \fR[\fIOPTIONS\fR...]\fB \ \fISRC_PATH ... \ \fBhw\fIN\fB:
-.gsc cp \ \  \fR[\fIOPTIONS\fR...]\fB \ \fISRC_FILE ... \ \fBhw\fIN\fB:
-.gsc cp \ \  \fR[\fIOPTIONS\fR...]\fB \ \fISRC_FILE \  \  \ \fBhw\fIN\fB:\fISPEC
+.gsc cp \ \ \ \fR[\fI\fB\-f\fR|\fB\-i\fR|\fB\-n\fR]\fB \ \fISRC_FILE \ \ \ \ \ \fBhw\fIN\fB:\fISPEC\ \ \ \ \ \ \ \ \ \fB# \fR[1]
+.gsc cp \ \ \ \fR[\fI\fB\-f\fR|\fB\-i\fR|\fB\-n\fR]\fB \ \fISRC_FILE ... \ \fBhw\fIN\fB:\ \ \ \ \ \ \ \ \ \ \ \ \ \fB# \fR[2]
+.gsc cp \ \ \ \fR[\fI\fB\-f\fR|\fB\-i\fR|\fB\-n\fR]\fB \ \fBhw\fIN\fB:\fISPEC \ \ \ \ \ \fIDST_FILE\ \ \ \ \ \ \ \ \ \fB# \fR[3]
+.gsc cp \ \ \ \fR[\fI\fB\-f\fR|\fB\-i\fR|\fB\-n\fR]\fB \ \fBhw\fIN\fB:\fISPEC \fI... \ \fIDST_DIR\ \ \ \ \ \ \ \ \ \ \fB# \fR[4]
+.gsc cp \-a \fR[\fI\fB\-f\fR|\fB\-i\fR|\fB\-n\fR]\fB \ hw\fIN\fB: \ \ \ \ \ \ \ \ \ \fIDST_DIR\ \ \ \ \ \ \ \ \ \ \fB# \fR[5]
 Copies files from local to remote or remote to local.
 .sse
 .sss options
