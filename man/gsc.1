@@ -1,0 +1,291 @@
+.\" Manual page for gsc client.
+.de sh
+.  RS 4
+.  PP
+\\fIsh$\\fR \\$*
+.  RE
+..
+.\"
+.de option
+.  TP
+.  BR \\$@
+..
+.de sss
+.  PP
+.  I "\\$*"
+..
+.\"
+.TH gsc 1
+.\"
+.SH "NAME"
+gsc \- command-line client to the gsc homework server
+.\"
+.SH "SYNOPSIS"
+.B gsc
+[\fB\-q\fR]
+[\fB\-v\fR]
+[\fB\-h\fR]
+[\fB\-V\fR]
+.IR "SUBCOMMAND " [ ARGS... ]
+.\"
+.SH "DESCRIPTION"
+.B gsc
+is a command-line client for interacting with the gsc homework server.
+It supports making an account, submitting and retrieving homework code,
+managing partnerships, and changing your password.
+.\"
+.SH "OPTIONS"
+.option \-q ", " \-\-quiet
+Makes output quieter
+.option \-v ", " \-\-verbose
+Makes output more verbose
+.option \-h ", " \-\-help
+Prints help information
+.option \-V ", " \-\-version
+Prints version information
+.\"
+.SH "CONVENTIONS"
+To use
+.BR gsc ", "
+it is often necessary to refer to both local files
+in your shell and remote files that have been submitted to the server.
+In the documentation for various commands, the syntax for referring to
+files is known as a \fISPEC\fR. \fISPEC\fRs take the following forms:
+.TP
+\fIhello.c\fR
+Refers to a local file named \fIhello.c\fR.
+.TP
+\fIhw2:hello.c\fR
+Refers to a remote file named \fIhello.c\fR that has been submitted as
+part of HW2.
+.TP
+\fIhw2:\fR
+Refers to the entire HW2 submission.
+.PP
+\fISPEC\fRs may also contain wildcard patterns that match multiple
+files. In particular, ``\fI*\fR'' matches any number of characters, and
+``\fI?\fR'' matches exactly one character. Patterns in local \fISPEC\fRs
+are expanded by the shell, but wildcards in remote \fISPEC\fR need to be
+expanded by
+.BR gsc ", "
+which means that they need to be quoted to prevent the shell from
+interpreting them. For example, to upload all \fI.c\fR files in local
+directory \fIsrc/\fR to HW5, you would run
+.sh gsc cp src/*.c hw5:
+.PP
+But to download all \fI.c\fR files from HW5 into local
+directory \fIsrc/\fR, you would run
+.sh gsc cp 'hw5:*.c' src/
+.\"
+.SH "SUBCOMMANDS"
+.SS "gsc auth \fIUSERNAME\fR"
+Authenticates with the homework server.
+.sss Details
+.PP
+Before you can authenticate, an account named \fIUSERNAME\fR must
+already exist. You can use \fBgsc create\fR to register an account.
+.PP
+After some period of time (14 days by default), your
+authentication will expire and you will need to run this command again.
+.PP
+.SS "gsc cat \fR[\fIOPTIONS...\fR] \fIREMOTE_SPEC...\fR"
+Prints the contents of the given \fIREMOTE_SPEC\fRs to the screen.
+.sss Options
+.option \-a ", " --all
+Allows \fIREMOTE_SPEC\fRs to refer to whole homeworks; otherwise, they
+must be individual files or wildcards.
+.SS "gsc cp -a \fR[\fIOPTIONS\fR...]\fB hw\fIN\fB:        \fIDST_SPEC\fR"
+.SS "gsc cp    \fR[\fIOPTIONS\fR...]\fB \fISRC_SPEC...\fR \fIDST_SPEC\fR"
+Copies files from local to remote or remote to local.
+.sss Options
+.option -a ", " --all
+Allows \fISRC_SPEC\fR to refer to a whole local directory or
+whole remote homework. Otherwise, sources must be individual files or
+wildcards.
+.option -f
+Forces overwriting existing local files without asking.
+.option -i
+Interactively asks before overwriting existing local files.
+.option -n
+Never overwrites existing local files.
+.sss Details
+.PP
+The
+.B "gsc cp"
+command is used to upload your homework from your shell account to the
+server, or to download an earlier submission back to your shell account.
+.B gsc
+cannot copy local to local or remote to remote. For the former, use
+.BR cp (1);
+for the latter, you will have to download and reupload.
+.PP
+In the first form, it downloads a whole remote homework into local
+directory \fIDST_SPEC\fR, creating it if necessary, and attempts to
+recreate the original project structure as well. In particular, it
+places files into subdirectories \fIsrc\fI, \fItest\fR, and
+\fIResources\fR, creating them if needed.
+.PP
+In the second form,
+.B "gsc cp"
+works like Unix
+.BR cp (1).
+In particular, if there is only one \fISRC_SPEC\fR, and if that one
+\fISRC_SPEC\fR names just one file (as opposed to being a directory or
+a wildcard that matches multiple files), then there are three
+possibilities:
+.IP 1. 4
+If \fIDST_SPEC\fR does not exist then it is created.
+.IP 2.
+If \fIDST_SPEC\fR is an existing file then \fISRC_SPEC\fR replaces it.
+.IP 3.
+If \fIDST_SPEC\fR is an existing local directory or a remote homework
+then \fISRC_SPEC\fR is copied into it.
+.PP
+Otherwise, there are multiple source files, which means that the
+destination must be a local directory or remote homework rather than a
+single file.
+.PP
+By default,
+.B "gsc cp"
+prompts before overwriting local files when downloading, but this
+behavior can be overridden with the \fB\-f\fR or \fB\-n\fR option.
+.sss Examples
+.PP
+Upload local file \fIcircle.c\fR to remote HW1:
+.sh gsc cp circle.c hw1:
+.PP
+Upload local file \fIcircle.c\fR to remote HW1, naming it
+\fIsquare.c\fR on the server:
+.sh gsc cp circle.c hw1:square.c
+.PP
+Download file \fIcircle.c\fR from remote HW1 to current
+directory:
+.sh gsc cp hw1:circle.c .
+.PP
+Download file \fIcircle.c\fR from remote HW1 to current
+directory, naming it \fIcircle.c.bak\fR locally and overwriting it if it
+already exists:
+.sh gsc cp -f hw1:circle.c circle.c.bak
+.PP
+Upload all \fI.c\fR files in the \fIsrc/\fR and \fItest/\fR
+subdirectories to remote HW1:
+.sh gsc cp src/*.c test/*.c hw1:
+.PP
+Upload all files in the \fIResources/\fR subdirectory to remote
+HW1:
+.sh gsc cp -a Resources hw1:
+.PP
+Download all files from remote HW1 whose name contains the word
+``\fItest\fR'' into the local \fItest/\fR subdirectory:
+.sh gsc cp 'hw1:*test*' test
+.PP
+Download all files from remote HW1, recreating the project
+structure in a local subdirectory named ``\fIfoobar\fR'':
+.sh gsc cp -a hw1: foobar
+.SS "gsc create \fIUSERNAME\fR"
+Creates a new account on the homework server.
+.sss Details
+.PP
+The name of the new account will be \fIUSERNAME\fR. This \fBMUST\fR
+be your Northwestern NetID (three or four letters followed by three
+digits), or you will not get credit for your submissions.
+.PP
+The command will prompt you to enter and then confirm a password, after
+which it will attempt to create an account with the homework server.
+Note that the server may reject a password as too weak. Passwords are
+evaluated based on the length and the number of different character
+classes (uppercase letter, lowercase letters, digits, and punctuation)
+involved.
+.SS "gsc deauth"
+Logs you out from the homework server.
+.SS "gsc help \fR[\fISUBCOMMAND\fR]"
+Prints the help message for a particular subcommand.
+.SS "gsc ls \fIREMOTE_SPEC..."
+Lists files on the homework server.
+.sss Details
+.PP
+There may be one or more \fIREMOTE_SPEC\fRs, and each may be a
+whole homework, a single file, or a wildcard possibly matching multiple
+files.
+.PP
+The results are displayed in a table with four columns:
+.IP 1. 4
+size (in bytes)
+.IP 2.
+upload time
+.IP 3.
+type (\fIs\fRource, \fIt\fRest, \fIc\fRonfig, \fIr\fResource, or
+\fIl\fRog)
+.IP 4.
+name
+.SS "gsc partner \fIACTION\fR \fBhw\fIN\fR \fIUSERNAME\fR"
+Creates, accepts, and cancels partner requests.
+.sss Details
+.PP
+The \fIN\fR in \fBhw\fIN\fR must be the number of a homework assignment
+that allows partners. To create or accept a request, you and your
+intended partner (given by \fIUSERNAME\fR) must not already have a
+partner for the specified homework.
+.PP
+The \fIACTION\fR must be one of:
+.TP 10
+\fBrequest\fR
+Creates a new request to partner with \fIUSERNAME\fR.
+.TP
+\fBaccept\fR
+Accepts an existing partner request that was created by \fIUSERNAME\fR.
+.TP
+\fBcancel\fR
+Cancels an existing partner request that was created by either you or
+\fIUSERNAME\fR.
+.PP
+To view outstanding partner requests, use the
+.B "gsc status"
+subcommand.
+.SS "gsc passwd"
+Changes your password.
+.sss Details
+.PP
+You must already be authenticated to change your password. If you don't
+know your password, contact course staff to have it reset.
+.PP
+The command will prompt you to enter and then confirm a password, after
+which it will attempt to change your password on the homework server.
+Note that the server may reject a password as too weak. Passwords are
+evaluated based on the length and the number of different character
+classes (uppercase letter, lowercase letters, digits, and punctuation)
+involved.
+.SS "gsc rm \fR[\fIOPTIONS...\fR] \fIREMOTE_SPEC..."
+Deletes files on the homework server.
+.sss Options
+.option \-a ", " --all
+Allows \fIREMOTE_SPEC\fRs to refer to whole homeworks; otherwise, they
+must be individual files or wildcards.
+.sss Example
+.PP
+Delete all \fI.log\fR files from HW1:
+.sh gsc rm 'hw1:*.log'
+.SS "gsc status \fR[\fBhw\fIN\fB:\fR]"
+Prints general or homework-specific status information.
+.sss Details
+.PP
+If no homework is specified then this subcommand prints a summary of
+homework grades and submission status, exam grades, and outstanding
+partner requests. If a particular homework is specified, then this
+subcommand prints more information specific to HW\fIN\fR.
+.SS "gsc whoami"
+Prints the current authenticated username.
+.\"
+.SH "AUTHOR"
+\fIjesse@eecs\.northwestern\.edu\fR
+.\"
+.SH "BUGS"
+\fIhttps://github\.com/tov/gsc\-client/issues\fR
+.\"
+.\"
+.SH "AUTHOR"
+\fIjesse@eecs\.northwestern\.edu\fR
+.\"
+.SH "BUGS"
+\fIhttps://github\.com/tov/gsc\-client/issues\fR
+.\"
