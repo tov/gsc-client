@@ -302,7 +302,7 @@ impl FilePurpose {
             Test     => "test",
             Config   => ".",
             Resource => "Resources",
-            Log      => "build",
+            Log      => ".",
         }
     }
 }
