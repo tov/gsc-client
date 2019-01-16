@@ -65,6 +65,19 @@ Prints help information
 Prints version information
 .\"
 .SH "CONVENTIONS"
+.
+.
+.
+.TP
+\fBhw\fIN\fR
+Refers to Homework \fIN\fR. For example, \fBhw1\fR or \fBhw4\fR.
+.TP
+\fIDIR\fR
+A local directory, such as \fIsrc\fR or \fItest\fR.
+.
+.
+.
+.P
 To use
 .BR gsc ", "
 it is often necessary to refer to both local files
@@ -110,14 +123,18 @@ already exist. You can use \fBgsc create\fR to register an account.
 After some period of time (14 days by default), your
 authentication will expire and you will need to run this command again.
 .sse
-.gsc cat \fR[\fIOPTIONS...\fR] \fIREMOTE_SPEC...\fR
+.gsc cat \fR[\fB\-a\fR|\fB\-\-all\fR] \fBhw\fIN\fR[\fB:\fISPEC\fR] \fI...
 Prints the contents of the given \fIREMOTE_SPEC\fRs to the screen.
 .sss options
 .option \-a ", " \-\-all
 Allows \fIREMOTE_SPEC\fRs to refer to whole homeworks; otherwise, they
 must be individual files or wildcards.
-.gsc cp \-a \fR[\fIOPTIONS\fR...]\fB hw\fIN\fB:        \fIDST_SPEC\fR
-.gsc cp    \fR[\fIOPTIONS\fR...]\fB \fISRC_SPEC...\fR \fIDST_SPEC\fR
+.gsc cp \-a \fR[\fIOPTIONS\fR...]\fB \ hw\fIN\fB: \ \  \  \  \  \fIDST_DIR\fR
+.gsc cp \ \  \fR[\fIOPTIONS\fR...]\fB \ \fBhw\fIN\fB:\fISPEC \fI... \ \fIDST_DIR\fR
+.gsc cp \ \  \fR[\fIOPTIONS\fR...]\fB \ \fBhw\fIN\fB:\fISPEC \  \  \ \fIDST_FILE\fR
+.gsc cp \-a \fR[\fIOPTIONS\fR...]\fB \ \fISRC_PATH ... \ \fBhw\fIN\fB:
+.gsc cp \ \  \fR[\fIOPTIONS\fR...]\fB \ \fISRC_FILE ... \ \fBhw\fIN\fB:
+.gsc cp \ \  \fR[\fIOPTIONS\fR...]\fB \ \fISRC_FILE \  \  \ \fBhw\fIN\fB:\fISPEC
 Copies files from local to remote or remote to local.
 .sse
 .sss options
@@ -224,7 +241,7 @@ involved.
 Logs you out from the homework server.
 .gsc help \fR[\fISUBCOMMAND\fR]
 Prints the help message for a particular subcommand.
-.gsc ls \fIREMOTE_SPEC...
+.gsc ls \fBhw\fIN\fR[\fB:\fISPEC\fR] \fI...
 Lists files on the homework server.
 .sss details
 There may be one or more \fIREMOTE_SPEC\fRs, and each may be a
@@ -279,12 +296,12 @@ evaluated based on the length and the number of different character
 classes (uppercase letter, lowercase letters, digits, and punctuation)
 involved.
 .sse
-.gsc rm \fR[\fIOPTIONS...\fR] \fIREMOTE_SPEC...
+.gsc rm \fR[\fB\-a\fR|\fB\-\-all\fR] \fBhw\fIN\fR[\fB:\fISPEC\fR] \fI...
 Deletes files on the homework server.
 .sss options
 .option \-a ", " \-\-all
-Allows \fIREMOTE_SPEC\fRs to refer to whole homeworks; otherwise, they
-must be individual files or wildcards.
+Allows \fISPEC\fRs to be blank, in order to delete whole homeworks;
+otherwise, each \fISPEC\fR must be non-empty.
 .sse
 .sss example
 Delete all \fI.log\fR files from HW1:
