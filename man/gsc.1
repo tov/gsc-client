@@ -120,7 +120,7 @@ homeworks; otherwise, each \fR<\fISPEC\fR> must be an individual file or
 wildcard pattern.
 .sse
 .sss examples
-View the contents of the \fIMakefile\fRs uploaded to HW3:
+View the contents of the \fIMakefile\fR uploaded to HW3:
 .sh gsc cat hw3:Makefile
 .PP
 View the contents of all \fI.h\fR files uploaded to HW3:
@@ -138,9 +138,8 @@ Copies files from local to remote or remote to local.
 .sse
 .sss options
 .option \-a ", " \-\-all
-Allows \fISPEC\fR to refer to a whole local directory or
-whole remote homework. Otherwise, sources must be individual files or
-wildcards.
+Allows \fR<\fISPEC\fR> to be blank, in order to download a whole
+remote homework.
 .option \-f
 Forces overwriting existing local files without asking.
 .option \-i
@@ -151,68 +150,72 @@ Never overwrites existing local files.
 .sss details
 The
 .B "gsc cp"
-command is used to upload your homework from your shell account to the
-server, or to download an earlier submission back to your shell account.
+command has five forms: forms 1 and 2 are used to upload ``local'' files
+from your shell account to the server, whereas forms 3, 4, and 5 are
+used to download files from an earlier submission back to your shell
+account.
 .B gsc
 cannot copy local to local or remote to remote. For the former, use
 .BR cp (1);
 for the latter, you will have to download and reupload.
 .PP
-In the first form, it downloads a whole remote homework into local
-directory \fIDST_SPEC\fR, creating it if necessary, and attempts to
-recreate the original project structure as well. In particular, it
-places files into subdirectories \fIsrc\fI, \fItest\fR, and
-\fIResources\fR, creating them if needed.
-.PP
-In the second form,
-.B "gsc cp"
-works like Unix
-.BR cp (1).
-In particular, if there is only one \fISPEC\fR, and if that one
-\fISPEC\fR names just one file (as opposed to being a directory or
-a wildcard pattern that matches multiple files), then there are three
-possibilities:
+The five forms are:
 .IP 1. 4
-If \fIDST_SPEC\fR does not exist then it is created.
+Uploads a single local file, <\fIFILE\fR>, to HW<\fIN\fR> on the
+server, naming the remote copy <\fISPEC\fR>. If <\fISPEC\fR>
+is a wildcard pattern, then it must match exactly one remote file, which
+will be overwritten. Otherwise, the remote file <\fISPEC\fR> is
+overwritten if it exists, or created if it does not.
 .IP 2.
-If \fIDST_SPEC\fR is an existing file then \fISRC_SPEC\fR replaces it.
+Uploads one or more local files to HW<\fIN\fR> on the homework
+server. (As with
+.BR cp (1),
+you cannot copy multiple source files to one destination file.)
 .IP 3.
-If \fIDST_SPEC\fR is an existing local directory or a remote homework
-then \fISRC_SPEC\fR is copied into it.
-.PP
-Otherwise, there are multiple source files, which means that the
-destination must be a local directory or remote homework rather than a
-single file.
+Downloads a single remote file matching <\fISPEC\fR> from
+HW\fR<\fIN\fR> on the server, saving it to local file <\fIFILE\fR>
+(which may or may not already exist). It is an error if
+\fBhw\fR<\fIN\fR>\fB:\fR<\fISPEC\fR> matches more than one remote
+file.
+.IP 4.
+Downloads one or more remote files from the server into local
+directory <\fIDIR\fR>, which must already exist.
+.IP 5.
+Downloads an entire remote homework submission into local
+directory <\fIDIR\fR>, creating it if necessary. Within <\fIDIR\fR>, it
+recreates the original project structure. In particular, it places files
+into subdirectories \fIsrc\fI, \fItest\fR, and \fIResources\fR, creating
+them as needed.
 .PP
 By default,
 .B "gsc cp"
 prompts before overwriting local files when downloading, but this
-behavior can be overridden with the \fB\-f\fR or \fB\-n\fR option.
+behavior can be overridden with the \fB\-f\fR or \fB\-n\fR options.
 .sse
 .sss examples
-Upload local file \fIcircle.c\fR to remote HW1:
-.sh gsc cp circle.c hw1:
-.PP
 Upload local file \fIcircle.c\fR to remote HW1, naming it
 \fIsquare.c\fR on the server:
 .sh gsc cp circle.c hw1:square.c
 .PP
-Download file \fIcircle.c\fR from remote HW1 to current
-directory:
-.sh gsc cp hw1:circle.c .
+Upload local file \fIcircle.c\fR to remote HW1:
+.sh gsc cp circle.c hw1:
 .PP
-Download file \fIcircle.c\fR from remote HW1 to current
-directory, naming it \fIcircle.c.bak\fR locally and overwriting it if it
-already exists:
-.sh gsc cp \-f hw1:circle.c circle.c.bak
+Upload all files in the \fIResources/\fR subdirectory to remote
+HW1:
+.sh gsc cp Resources/* hw1:
 .PP
 Upload all \fI.c\fR files in the \fIsrc/\fR and \fItest/\fR
 subdirectories to remote HW1:
 .sh gsc cp src/*.c test/*.c hw1:
 .PP
-Upload all files in the \fIResources/\fR subdirectory to remote
-HW1:
-.sh gsc cp \-a Resources hw1:
+Download file \fIcircle.c\fR from remote HW1 to current
+directory, naming it \fIcircle.c.bak\fR locally and overwriting that
+file if it already exists:
+.sh gsc cp \-f hw1:circle.c circle.c.bak
+.PP
+Download file \fIcircle.c\fR from remote HW1 to the current
+directory:
+.sh gsc cp hw1:circle.c .
 .PP
 Download all files from remote HW1 whose name contains the word
 ``\fItest\fR'' into the local \fItest/\fR subdirectory:
