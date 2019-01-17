@@ -86,8 +86,8 @@ Refers to file(s) matching \fR<\fISPEC\fR> submitted to Homework \fR<\fIN\fR> on
 the GSC homework server.
 .PP
 \fR<\fISPEC\fR>s may contain wildcard patterns that match multiple files on
-the server. In particular, ``\fI*\fR'' matches any number of characters,
-and ``\fI?\fR'' matches exactly one character. Patterns in local
+the server. In particular, \[lq]\fI*\fR\[rq] matches any number of characters,
+and \[lq]\fI?\fR\[rq] matches exactly one character. Patterns in local
 \fR<\fIFILE\fR>s are expanded by the shell, but wildcard patterns in remote
 \fR<\fISPEC\fR>s need to be expanded by
 .BR gsc ", "
@@ -150,7 +150,7 @@ Never overwrites existing local files.
 .sss details
 The
 .B "gsc cp"
-command has five forms: forms 1 and 2 are used to upload ``local'' files
+command has five forms: forms 1 and 2 are used to upload \[lq]local\[rq] files
 from your shell account to the server, whereas forms 3, 4, and 5 are
 used to download files from an earlier submission back to your shell
 account.
@@ -218,11 +218,11 @@ directory:
 .sh gsc cp hw1:circle.c .
 .PP
 Download all files from remote HW1 whose name contains the word
-``\fItest\fR'' into the local \fItest/\fR subdirectory:
+\[lq]\fItest\fR\[rq] into the local \fItest/\fR subdirectory:
 .sh gsc cp 'hw1:*test*' test
 .PP
 Download all files from remote HW1, recreating the project
-structure in a local subdirectory named ``\fIfoobar\fR'':
+structure in a local subdirectory named \[lq]\fIfoobar\fR\[rq]:
 .sh gsc cp \-a hw1: foobar
 .sse
 .gsc create \fR<\fIUSERNAME\fR>
