@@ -34,10 +34,10 @@
 \fR[\fB\\$1\fR]
 ..
 .\"
-.TH gsc 1
+.TH GSC 1 "January 16, 2019" "Jesse A. Tov"
 .\"
 .SH "NAME"
-gsc \- command-line client to the gsc homework server
+gsc \- command-line client to the GSC homework server
 .\"
 .SH "SYNOPSIS"
 .SY gsc
@@ -51,7 +51,7 @@ gsc \- command-line client to the gsc homework server
 .\"
 .SH "DESCRIPTION"
 .B gsc
-is a command-line client for interacting with the gsc homework server.
+is a command-line client for interacting with the GSC homework server.
 It supports making an account, submitting and retrieving homework code,
 managing partnerships, and changing your password.
 .\"
@@ -79,11 +79,11 @@ Refers to a local file in your shell account.
 Refers to a local directory in your shell account.
 .TP
 \fBhw\fR<\fIN\fR>
-Refers to Homework \fR<\fIN\fR> on the gsc homework server.
+Refers to Homework \fR<\fIN\fR> on the GSC homework server.
 .TP
 \fBhw\fR<\fIN\fR>\fB:\fR<\fISPEC\fR>
 Refers to file(s) matching \fR<\fISPEC\fR> submitted to Homework \fR<\fIN\fR> on
-the gsc homework server.
+the GSC homework server.
 .PP
 \fR<\fISPEC\fR>s may contain wildcard patterns that match multiple files on
 the server. In particular, ``\fI*\fR'' matches any number of characters,
@@ -340,8 +340,8 @@ flags.
 .PP
 .TP
 \fBendpoint: \fR<\fIURI\fR>
-\fR<\fIURI\fR> must point to an endpoint running the gsc homework
-server. This is probably only useful if you run your own gsc homework
+\fR<\fIURI\fR> must point to an endpoint running the GSC homework
+server. This is probably only useful if you run your own GSC homework
 server.
 .PP
 Additionally, by default
@@ -358,3 +358,6 @@ is set then it uses that file instead.
 .SH "BUGS"
 \fIhttps://github\.com/tov/gsc\-client/issues\fR
 .\"
+.SH "SEE ALSO"
+.BR submit211 (7),
+.BR cp (1)
