@@ -1,6 +1,4 @@
 #!/bin/sh
 
-for i in man/*; do
-    section=$(echo "$i" | sed 's/.*[.]//')
-    install -Dm 755 "$i" "$TOV_PUB/share/man/man$section/"
-done
+tar c man | tar xvC "$TOV_PUB/share"
+chmod -R a+rX "$TOV_PUB/share/man"
