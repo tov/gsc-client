@@ -14,11 +14,11 @@ fn main() {
         Err(err)  => {
             ve1!("{}", err);
 
-            let mut cause = err.cause();
+            let mut source = err.source();
 
-            while let Some(error) = cause {
-                ve1!("Cause: {}", error);
-                cause = error.cause();
+            while let Some(error) = source {
+                ve1!("Source: {}", error);
+                source = error.source();
             }
 
             exit(1);
