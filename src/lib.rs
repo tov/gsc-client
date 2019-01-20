@@ -112,11 +112,8 @@ impl GscClient {
         Ok(())
     }
 
-    pub fn admin_set_auto(&self,
-                          username: &str,
-                          hw: usize,
-                          score: f64,
-                          comment: &str) -> Result<()> {
+    fn get_evals(&self, username: &str, hw: usize)
+        -> Result<Vec<messages::EvalShort>> {
 
         let cookie       = self.load_cookie_file()?;
         let uri          = self.get_uri_for_submission(username, hw, cookie)?;
@@ -127,7 +124,16 @@ impl GscClient {
         let uri          = format!("{}{}", self.config.get_endpoint(), submission.evals_uri);
         let request      = self.http.get(&uri);
         let mut response = self.send_request(request)?;
-        let evals: Vec<messages::EvalShort> = response.json()?;
+        Ok(response.json()?)
+    }
+
+    pub fn admin_set_auto(&self,
+                          username: &str,
+                          hw: usize,
+                          score: f64,
+                          comment: &str) -> Result<()> {
+
+        let evals = self.get_evals(username, hw)?;
 
         let eval = evals
             .iter()
@@ -538,7 +544,7 @@ impl GscClient {
                                 .unwrap_or_else(|e| format!("<error: {}>", e));
                             table.add_row(tabular::Row::new()
                                 .with_cell(line_no)
-                                .with_cell(line.trim_right()));
+                                .with_cell(line.trim_end()));
                         }
 
                         table.add_heading(String::new());
