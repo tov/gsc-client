@@ -127,19 +127,12 @@ impl GscClient {
         Ok(response.json()?)
     }
 
-    pub fn admin_set_auto(&self,
-                          username: &str,
-                          hw: usize,
-                          score: f64,
-                          comment: &str) -> Result<()> {
-
-        let evals = self.get_evals(username, hw)?;
-
-        let eval = evals
-            .iter()
-            .filter(|eval| eval.eval_type == messages::EvalType::Informational)
-            .last()
-            .chain_err(|| ErrorKind::NoInformationalEvalItem)?;
+    fn set_grade(&self,
+                 username: &str,
+                 hw: usize,
+                 eval: &messages::EvalShort,
+                 score: f64,
+                 comment: &str) -> Result<()> {
 
         let uri          = format!("{}{}/grader", self.config.get_endpoint(), eval.uri);
         let mut request  = self.http.put(&uri);
@@ -156,6 +149,33 @@ impl GscClient {
 
         v2!("Set user {}’s hw{}, item {} to {}", username, hw, eval.sequence, result.score);
         Ok(())
+    }
+
+    pub fn admin_set_grade(&self,
+                           username: &str,
+                           hw: usize,
+                           number: usize,
+                           score: f64,
+                           comment: &str) -> Result<()> {
+
+        let eval = self.get_evals(username, hw)?
+            .into_iter().nth(number).ok_or_else(||
+                ErrorKind::EvalItemDoesNotExist(hw, number))?;
+        self.set_grade(username, hw, &eval, score, comment)
+    }
+
+    pub fn admin_set_auto(&self,
+                          username: &str,
+                          hw: usize,
+                          score: f64,
+                          comment: &str) -> Result<()> {
+
+        let eval = self.get_evals(username, hw)?
+            .into_iter()
+            .filter(|eval| eval.eval_type == messages::EvalType::Informational)
+            .last()
+            .chain_err(|| ErrorKind::NoInformationalEvalItem)?;
+        self.set_grade(username, hw, &eval, score, comment)
     }
 
     pub fn admin_set_exam(&self,

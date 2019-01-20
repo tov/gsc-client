@@ -17,7 +17,7 @@ fn main() {
             let mut source = err.source();
 
             while let Some(error) = source {
-                ve1!("Source: {}", error);
+            ve1!("Source: {}", error);
                 source = error.source();
             }
 
@@ -33,6 +33,7 @@ enum Command {
     AdminDivorce{user: String, hw: usize},
     AdminExtend{user: String, hw: usize, date: String, eval: bool},
     AdminPartners{user: String, hw: usize},
+    AdminSetGrade{user: String, hw: usize, number: usize, score: f64, comment: String},
     AdminSetAuto{user: String, hw: usize, score: f64, comment: String},
     AdminSetExam{user: String, exam: usize, num: usize, den: usize},
     AdminSubmissions{hw: usize},
@@ -65,6 +66,9 @@ fn do_it() -> Result<bool> {
         AdminExtend{user, hw, date, eval}
                                      => client.admin_extend(&user, hw, &date, eval),
         AdminPartners{user, hw}      => client.admin_partners(&user, hw),
+        AdminSetGrade{user, hw, number, score, comment}
+                                     => client.admin_set_grade(&user, hw, number,
+                                                               score, &comment),
         AdminSetAuto{user, hw, score, comment}
                                      => client.admin_set_auto(&user, hw, score, &comment),
         AdminSetExam{user, exam, num, den}
@@ -202,6 +206,14 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 let hw   = parse_hw(subsubmatches.value_of("HW").unwrap())?;
                 let user = subsubmatches.value_of("USER").unwrap().to_owned();
                 Ok(Command::AdminPartners { user, hw })
+            } else if let Some(subsubmatches) = submatches.subcommand_matches("set_grade") {
+                process_common(subsubmatches, config);
+                let hw      = parse_hw(subsubmatches.value_of("HW").unwrap())?;
+                let user    = subsubmatches.value_of("USER").unwrap().to_owned();
+                let number  = subsubmatches.value_of("NUMBER").unwrap().parse()?;
+                let score   = subsubmatches.value_of("SCORE").unwrap().parse()?;
+                let comment = subsubmatches.value_of("COMMENT").unwrap().to_owned();
+                Ok(Command::AdminSetGrade { hw, user, number, score, comment })
             } else if let Some(subsubmatches) = submatches.subcommand_matches("set_auto") {
                 process_common(subsubmatches, config);
                 let hw      = parse_hw(subsubmatches.value_of("HW").unwrap())?;
@@ -413,6 +425,14 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
                 .add_common()
                 .req_arg("HW", "The homework to lookup")
                 .req_arg("USER", "The user to lookup"))
+            .subcommand(SubCommand::with_name("set_grade")
+                .about("Records the grade for any eval item")
+                .add_common()
+                .req_arg("HW", "The homework to set the grade on")
+                .req_arg("USER", "The user whose grade to set")
+                .req_arg("NUMBER", "The eval item number to set")
+                .req_arg("SCORE", "The score [0.0, 1.0]")
+                .req_arg("COMMENT", "A comment"))
             .subcommand(SubCommand::with_name("set_auto")
                 .about("Records the result of the autograder")
                 .add_common()

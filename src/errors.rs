@@ -119,6 +119,11 @@ error_chain! {
             display("Could not find informational eval item to add score to.")
         }
 
+        EvalItemDoesNotExist(hw: usize, number: usize) {
+            description("requested eval item does not exist")
+            display("Homework {} does not have item {}.", hw, number)
+        }
+
         DestinationFileExists(filename: String) {
             description("destination file exists, and flag ‘-n’ was given")
             display("Not overwriting destination file ‘{}’ (-n).", filename)
