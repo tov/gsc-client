@@ -771,7 +771,7 @@ impl GscClient {
             for s in &user.submissions {
                 let grade = match s.status {
                     messages::SubmissionStatus::Future => continue,
-                    messages::SubmissionStatus::Closed => format!("{:.1}%", s.grade),
+                    messages::SubmissionStatus::Closed => format!("{:.1}%", 100.0 * s.grade),
                     _ => String::new(),
                 };
 
