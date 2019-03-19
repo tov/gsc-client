@@ -43,6 +43,8 @@ enum Command {
     Create{user: String},
     Cp{srcs: Vec<CpArg>, dst: CpArg},
     Deauth,
+    EvalGet {hw: usize, number: usize},
+    EvalSet {hw: usize, number: usize, score: f64, explanation: String},
     Ls{rpats: Vec<RemotePattern>},
     Partner,
     PartnerRequest{hw: usize, them: String},
@@ -82,6 +84,9 @@ fn do_it() -> Result<bool> {
         Create{user}                 => client.create(&user),
         Cp{srcs, dst}                => client.cp(&srcs, &dst),
         Deauth                       => client.deauth(),
+        EvalGet{hw, number}          => client.get_eval(hw, number),
+        EvalSet{hw, number, score, explanation}
+                                     => client.set_eval(hw, number, score, &explanation),
         Ls{rpats}                    => client.ls(&rpats),
         Partner                      => client.partner(),
         PartnerRequest{hw, them}     => client.partner_request(hw, &them),
@@ -149,6 +154,19 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             .subcommand(SubCommand::with_name("deauth")
                 .about("Forgets authentication credentials")
                 .add_common())
+            .subcommand(SubCommand::with_name("eval")
+                .about("Manages self evaluation")
+                .add_common()
+                .subcommand(SubCommand::with_name("get")
+                    .about("Performs self evaluation")
+                    .req_arg("HW", "The homework to lookup")
+                    .req_arg("NUMBER", "The eval item to lookup")
+                .subcommand(SubCommand::with_name("set")
+                    .about("Performs self evaluation")
+                    .req_arg("HW", "The homework to evaluate")
+                    .req_arg("NUMBER", "The eval item to set")
+                    .req_arg("SCORE", "The score [0.0, 1.0]")
+                    .opt_arg("EXPLANATION", "Your justification for the score"))))
             .subcommand(SubCommand::with_name("ls")
                 .about("Lists files")
                 .add_common()
@@ -310,6 +328,28 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             Ok(Command::Deauth)
         }
 
+        else if let Some(submatches) = matches.subcommand_matches("eval") {
+            process_common(submatches, config);
+
+            let mut process_eval = |matches: &clap::ArgMatches| -> Result<_> {
+                process_common(matches, config);
+                let hw     = matches.value_of("HW").unwrap();
+                let number = matches.value_of("NUMBER").unwrap();
+                Ok((parse_hw(hw)?, number.parse()?))
+            };
+
+            if let Some(subsubmatches) = submatches.subcommand_matches("set") {
+                let (hw, number) = process_eval(subsubmatches)?;
+                let score        = subsubmatches.value_of("SCORE").unwrap().parse()?;
+                let explanation  = subsubmatches.value_of("COMMENT").unwrap_or("").to_owned();
+                Ok(Command::EvalSet{hw, number, score, explanation})
+            } else if let Some(subsubmatches) = submatches.subcommand_matches("get") {
+                let (hw, number) = process_eval(subsubmatches)?;
+                Ok(Command::EvalGet{hw, number})
+            } else {
+                panic!("No other eval commands");
+            }
+        }
         else if let Some(submatches) = matches.subcommand_matches("ls") {
             process_common(submatches, config);
             

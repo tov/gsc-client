@@ -14,8 +14,11 @@ pub mod config;
 pub mod errors;
 pub mod messages;
 
+mod util;
+
 use self::errors::*;
 use self::cookie::*;
+use self::util::{Percentage, hanging};
 
 pub struct GscClient {
     http:               reqwest::Client,
@@ -183,7 +186,10 @@ impl GscClient {
                            comment: &str) -> Result<()> {
 
         let eval = self.get_evals(username, hw)?
-            .into_iter().nth(number).ok_or_else(||
+            .into_iter()
+            .filter(|eval| eval.sequence == number)
+            .next()
+            .ok_or_else(||
                 ErrorKind::EvalItemDoesNotExist(hw, number))?;
         self.set_grade(username, hw, &eval, score, comment)
     }
@@ -626,6 +632,47 @@ impl GscClient {
         v2!("Created account: {}.", username);
 
         Ok(())
+    }
+
+    pub fn get_eval(&self, hw: usize, number: usize) -> Result<()> {
+        let (me, cookie) = self.load_credentials()?;
+        let uri          = self.get_uri_for_submission(&me, hw, cookie)?;
+        let request      = self.http.get(&uri);
+        let mut response = self.send_request(request)?;
+        let submission: messages::Submission = response.json()?;
+
+        let uri          = format!("{}{}/{}",
+                                   self.config.get_endpoint(),
+                                   submission.evals_uri,
+                                   number);
+        let request      = self.http.get(&uri);
+        let mut response = self.send_request(request)?;
+        let eval: messages::Eval = response.json()?;
+
+        v1!("Homework {} item {} ({:?}, {})",
+            hw, number, eval.eval_type, Percentage(eval.value));
+        v1!("{}", hanging(&eval.prompt));
+
+        if let Some(ref self_eval) = eval.self_eval {
+            v1!("Self evaluation:   {}", Percentage(self_eval.score));
+            v1!("{}", hanging(&self_eval.explanation));
+        }
+
+        if let Some(ref grader_eval) = eval.grader_eval {
+            v1!("Grader evaluation: {}", Percentage(grader_eval.score));
+            v1!("{}", hanging(&grader_eval.explanation));
+        }
+
+        Ok(())
+    }
+
+    pub fn set_eval(&self,
+                    hw: usize,
+                    number: usize,
+                    score: f64,
+                    explanation: &str) -> Result<()> {
+
+        panic!();
     }
 
     pub fn ls(&self, rpats: &[RemotePattern]) -> Result<()> {
