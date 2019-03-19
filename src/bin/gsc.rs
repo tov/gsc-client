@@ -158,15 +158,15 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 .about("Manages self evaluation")
                 .add_common()
                 .subcommand(SubCommand::with_name("get")
-                    .about("Performs self evaluation")
+                    .about("Shows evaluation")
                     .req_arg("HW", "The homework to lookup")
-                    .req_arg("NUMBER", "The eval item to lookup")
+                    .req_arg("NUMBER", "The eval item to lookup"))
                 .subcommand(SubCommand::with_name("set")
                     .about("Performs self evaluation")
                     .req_arg("HW", "The homework to evaluate")
                     .req_arg("NUMBER", "The eval item to set")
                     .req_arg("SCORE", "The score [0.0, 1.0]")
-                    .opt_arg("EXPLANATION", "Your justification for the score"))))
+                    .opt_arg("EXPLANATION", "Your justification for the score")))
             .subcommand(SubCommand::with_name("ls")
                 .about("Lists files")
                 .add_common()
@@ -340,8 +340,8 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
 
             if let Some(subsubmatches) = submatches.subcommand_matches("set") {
                 let (hw, number) = process_eval(subsubmatches)?;
-                let score        = subsubmatches.value_of("SCORE").unwrap().parse()?;
-                let explanation  = subsubmatches.value_of("COMMENT").unwrap_or("").to_owned();
+                let score        = 0.01 * subsubmatches.value_of("SCORE").unwrap().parse::<f64>()?;
+                let explanation  = subsubmatches.value_of("EXPLANATION").unwrap_or("").to_owned();
                 Ok(Command::EvalSet{hw, number, score, explanation})
             } else if let Some(subsubmatches) = submatches.subcommand_matches("get") {
                 let (hw, number) = process_eval(subsubmatches)?;

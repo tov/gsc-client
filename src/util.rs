@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter, Result};
 
 pub struct Percentage(pub f64);
 
-impl std::fmt::Display for Percentage {
+impl Display for Percentage {
     fn fmt(&self, f: &mut Formatter) -> Result {
         write!(f, "{:.1}%", 100.0 * self.0)
     }

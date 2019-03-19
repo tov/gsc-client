@@ -672,7 +672,31 @@ impl GscClient {
                     score: f64,
                     explanation: &str) -> Result<()> {
 
-        panic!();
+        let (me, cookie) = self.load_credentials()?;
+        let uri          = self.get_uri_for_submission(&me, hw, cookie)?;
+        let request      = self.http.get(&uri);
+        let mut response = self.send_request(request)?;
+        let submission: messages::Submission = response.json()?;
+
+        let uri          = format!("{}{}/{}/self",
+                                   self.config.get_endpoint(),
+                                   submission.evals_uri,
+                                   number);
+        let mut request  = self.http.put(&uri);
+        let message      = messages::SelfEval {
+            uri,
+            score,
+            explanation: explanation.to_owned(),
+            permalink:   String::new(),
+        };
+        request          = request.json(&message);
+        let mut response = self.send_request(request)?;
+        let result: messages::SelfEval = response.json()?;
+
+        v2!("Set hw{} item {} self eval to {}",
+            hw, number, Percentage(result.score));
+
+        Ok(())
     }
 
     pub fn ls(&self, rpats: &[RemotePattern]) -> Result<()> {

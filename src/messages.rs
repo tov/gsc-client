@@ -129,7 +129,7 @@ pub struct User {
     pub submissions:        Vec<SubmissionShort>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SelfEval {
     pub uri:                String,
     pub score:              f64,
