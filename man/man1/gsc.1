@@ -136,7 +136,6 @@ View the contents of all files uploaded to HW3:
 .gsc cp \ \ \ \fR[\fI\fB\-f\fR|\fB\-i\fR|\fB\-n\fR]\fB \ \fBhw\fR<\fIN\fR>\fB:\fR<\fISPEC\fR> \fI... \ \fR<\fIDIR\fR>\ \ \ \ \ \ \ \ \ \ \fB# \fR[4]
 .gsc cp \-a \fR[\fI\fB\-f\fR|\fB\-i\fR|\fB\-n\fR]\fB \ hw\fR<\fIN\fR>\fB: \ \ \ \ \ \ \ \ \ \ \ \fR<\fIDIR\fR>\ \ \ \ \ \ \ \ \ \ \fB# \fR[5]
 Copies files from local to remote or remote to local.
-.sse
 .sss options
 .option \-a ", " \-\-all
 Allows \fR<\fISPEC\fR> to be blank, in order to download a whole
@@ -242,6 +241,18 @@ involved.
 .sse
 .gsc deauth
 Logs you out from the homework server.
+.gsc eval get \fBhw\fR<\fIN\fR> \fR<\fINUMBER\fR>
+Displays evaluation item \fINUMBER\fR from Homework \fIN\fR. This will
+show the prompt, your self evaluation if any, and the grader evaluation
+if any.
+.gsc eval set \fBhw\fR<\fIN\fR> \fR<\fINUMBER\fR> \fR<\fISCORE\fR> [<\fIEXPLANATION\fR>]
+Sets the self evaluation for item \fINUMBER\fR of Homework \fIN\fR to
+\fISCORE\fR% (which should be between 0 and 100). Sets the explanation if
+provided.
+.sss example
+Set eval item 4 of HW3 to yes, with two line tags:
+.sh gsc eval set hw3 4 100 'L60 and L82'
+.sse
 .gsc help \fR[<\fISUBCOMMAND\fR>]
 Prints the help message for a particular subcommand.
 .gsc ls \fBhw\fR<\fIN\fR>\fB:\fR[<\fISPEC\fR>] \fI...
@@ -309,9 +320,9 @@ otherwise, each \fR<\fISPEC\fR> must be non-empty.
 .sss example
 Delete all \fI.log\fR files from HW1:
 .sh gsc rm \[aq]hw1:*.log\[aq]
+.sse
 .gsc status \fR[\fBhw\fR<\fIN\fR>]
 Prints general or homework-specific status information.
-.sse
 .sss details
 If no homework is specified then this subcommand prints a summary of
 homework grades and submission status, exam grades, and outstanding
