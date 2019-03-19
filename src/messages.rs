@@ -134,6 +134,7 @@ pub struct SelfEval {
     pub uri:                String,
     pub score:              f64,
     pub explanation:        String,
+    pub permalink:          String,
 }
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]

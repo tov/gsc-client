@@ -33,6 +33,7 @@ enum Command {
     AdminDivorce{user: String, hw: usize},
     AdminExtend{user: String, hw: usize, date: String, eval: bool},
     AdminPartners{user: String, hw: usize},
+    AdminPermalink{user: String, hw: usize, number: usize},
     AdminSetGrade{user: String, hw: usize, number: usize, score: f64, comment: String},
     AdminSetAuto{user: String, hw: usize, score: f64, comment: String},
     AdminSetExam{user: String, exam: usize, num: usize, den: usize},
@@ -66,6 +67,8 @@ fn do_it() -> Result<bool> {
         AdminExtend{user, hw, date, eval}
                                      => client.admin_extend(&user, hw, &date, eval),
         AdminPartners{user, hw}      => client.admin_partners(&user, hw),
+        AdminPermalink{user, hw, number}
+                                     => client.admin_permalink(&user, hw, number),
         AdminSetGrade{user, hw, number, score, comment}
                                      => client.admin_set_grade(&user, hw, number,
                                                                score, &comment),
@@ -206,6 +209,12 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 let hw   = parse_hw(subsubmatches.value_of("HW").unwrap())?;
                 let user = subsubmatches.value_of("USER").unwrap().to_owned();
                 Ok(Command::AdminPartners { user, hw })
+            } else if let Some(subsubmatches) = submatches.subcommand_matches("permalink") {
+                process_common(subsubmatches, config);
+                let hw      = parse_hw(subsubmatches.value_of("HW").unwrap())?;
+                let user    = subsubmatches.value_of("USER").unwrap().to_owned();
+                let number  = subsubmatches.value_of("NUMBER").unwrap().parse()?;
+                Ok(Command::AdminPermalink { hw, user, number })
             } else if let Some(subsubmatches) = submatches.subcommand_matches("set_grade") {
                 process_common(subsubmatches, config);
                 let hw      = parse_hw(subsubmatches.value_of("HW").unwrap())?;
@@ -425,6 +434,12 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
                 .add_common()
                 .req_arg("HW", "The homework to lookup")
                 .req_arg("USER", "The user to lookup"))
+            .subcommand(SubCommand::with_name("permalink")
+                .about("Prints the permalink hash for a given self evaluation")
+                .add_common()
+                .req_arg("HW", "The homework of the self evaluation")
+                .req_arg("USER", "The user whose self evaluation to find")
+                .req_arg("NUMBER", "The eval item number to find"))
             .subcommand(SubCommand::with_name("set_grade")
                 .about("Records the grade for any eval item")
                 .add_common()

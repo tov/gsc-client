@@ -94,6 +94,30 @@ impl GscClient {
         self.print_results(response)
     }
 
+    pub fn admin_permalink(&self,
+                           username: &str,
+                           hw: usize,
+                           number: usize) -> Result<()> {
+
+        let cookie       = self.load_cookie_file()?;
+        let uri          = self.get_uri_for_submission(username, hw, cookie)?;
+        let request      = self.http.get(&uri);
+        let mut response = self.send_request(request)?;
+        let submission: messages::Submission = response.json()?;
+
+        let uri          = format!("{}{}/{}/self",
+                                   self.config.get_endpoint(),
+                                   submission.evals_uri,
+                                   number);
+        let request      = self.http.get(&uri);
+        let mut response = self.send_request(request)?;
+        let self_eval: messages::SelfEval = response.json()?;
+
+        v1!("{}", self_eval.permalink);
+
+        Ok(())
+    }
+
     pub fn admin_partners(&self, username: &str, hw: usize) -> Result<()> {
         let cookie       = self.load_cookie_file()?;
         let uri          = self.get_uri_for_submission(username, hw, cookie)?;
