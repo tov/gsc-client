@@ -1,13 +1,12 @@
 #![recursion_limit = "128"]
 
-use vlog::*;
 use percent_encoding::{utf8_percent_encode, define_encode_set};
-use thousands::Separable;
 
 use std::cell::{Cell, RefCell};
 use std::collections::{hash_map, HashMap};
-use std::io::{self, BufRead, BufReader, Write};
-use std::path::{Path, PathBuf};
+use std::io::{self, BufRead, BufReader};
+use std::ops::Deref;
+use std::path::Path;
 
 pub mod cookie;
 pub mod config;
@@ -15,8 +14,26 @@ pub mod errors;
 pub mod messages;
 
 mod util;
+mod cmd;
+mod args;
 
-use self::errors::*;
+pub mod prelude {
+    pub use thousands::Separable;
+    pub use vlog::*;
+
+    pub use crate::{
+        GscClient,
+        args::{traits::{RemotePath, Qualified, Unqualified},
+               types::{CpArg, HwOptQual, HwQual,
+                       RemoteDestination, RemotePattern}},
+        errors::{Error, ErrorKind, JsonStatus, RemoteFiles, ResultExt},
+    };
+
+    pub type Result<T, E = Error> = std::result::Result<T, E>;
+}
+
+pub use prelude::*;
+
 use self::cookie::*;
 use self::util::{Percentage, hanging};
 
@@ -25,17 +42,6 @@ pub struct GscClient {
     config:             config::Config,
     submission_uris:    RefCell<HashMap<String, Vec<Option<String>>>>,
     had_warning:        Cell<bool>,
-}
-
-#[derive(Clone, Debug)]
-pub struct RemotePattern {
-    pub hw:     usize,
-    pub pat:    String,
-}
-
-pub enum CpArg {
-    Local(PathBuf),
-    Remote(RemotePattern),
 }
 
 impl GscClient {
@@ -67,7 +73,7 @@ impl GscClient {
         let uri          = format!("{}/api/grades.csv", self.config.get_endpoint());
         let request      = self.http.get(&uri);
         let mut response = self.send_request(request)?;
-        response.copy_to(&mut std::io::stdout())?;
+        response.copy_to(&mut io::stdout())?;
         Ok(())
     }
 
@@ -323,8 +329,8 @@ impl GscClient {
                 if src_rpat.is_whole_hw() {
                     Err(ErrorKind::SourceHwToDestinationFile(src_rpat.hw, dst.to_owned()))?;
                 } else {
-                    let src_file = self.fetch_one_filename(src_rpat)?;
-                    if self.is_okay_to_overwrite(policy, || dst.display())? {
+                    let src_file = self.fetch_one_matching_filename(src_rpat)?;
+                    if policy.confirm_overwrite(|| dst.display())? {
                         self.download_file(src_rpat.hw, &src_file, dst)?;
                     }
                 }
@@ -341,7 +347,7 @@ impl GscClient {
                     soft_create_dir(dst)?;
                     self.download_hw(policy, src_rpat.hw, dst)?;
                 } else {
-                    let src_file = self.fetch_one_filename(src_rpat)?;
+                    let src_file = self.fetch_one_matching_filename(src_rpat)?;
                     self.download_file(src_rpat.hw, &src_file, dst)?;
                 }
             }
@@ -352,12 +358,12 @@ impl GscClient {
                         if src_rpat.is_whole_hw() {
                             self.download_hw(policy, src_rpat.hw, dst)?;
                         } else {
-                            let src_metas = self.fetch_nonempty_file_list(src_rpat)?;
+                            let src_metas = self.fetch_nonempty_matching_file_list(src_rpat)?;
 
                             for src_meta in src_metas {
                                 let mut file_dst = dst.to_owned();
                                 file_dst.push(&src_meta.name);
-                                if self.is_okay_to_write(policy, &file_dst)? {
+                                if self.is_okay_to_write_local(policy, &file_dst)? {
                                     self.download_file(src_rpat.hw, &src_meta, &file_dst)?;
                                 }
                             }
@@ -392,15 +398,15 @@ impl GscClient {
     fn download_hw(&self, policy: &mut config::OverwritePolicy, hw: usize, dst: &Path)
         -> Result<()> {
 
-        let rpat      = RemotePattern { hw, pat: String::new() };
-        let src_metas = self.fetch_file_list(&rpat)?;
+        let rpat      = HwQual::just_hw(hw);
+        let src_metas = self.fetch_matching_file_list(&rpat)?;
 
         for src_meta in src_metas {
             let mut file_dst = dst.to_owned();
             file_dst.push(src_meta.purpose.to_dir());
             soft_create_dir(&file_dst)?;
             file_dst.push(&src_meta.name);
-            if self.is_okay_to_write(policy, &file_dst)? {
+            if self.is_okay_to_write_local(policy, &file_dst)? {
                 self.download_file(hw, &src_meta, &file_dst)?;
             }
         }
@@ -429,7 +435,7 @@ impl GscClient {
                         continue;
                     }
                 };
-                self.upload_file(src, &dst.with_pat(filename))?;
+                self.upload_file(src, &dst.with_name(filename))?;
             }
         } else {
             let src = if srcs.len() == 1 {
@@ -438,14 +444,14 @@ impl GscClient {
                 Err(ErrorKind::MultipleSourcesOneDestination)?
             };
 
-            let dsts     = self.fetch_file_list(dst)?;
+            let dsts     = self.fetch_matching_file_list(dst)?;
             let filename = match dsts.len() {
-                0 => &dst.pat,
+                0 => &dst.name,
                 1 => &dsts[0].name,
-                _ => Err(dest_pat_is_multiple(dst, &dsts))?,
+                _ => Err(Error::dest_pat_is_multiple(dst, &dsts))?,
             };
 
-            self.upload_file(src, &dst.with_pat(filename))?;
+            self.upload_file(src, &dst.with_name(filename))?;
         }
 
         v2!("Done.");
@@ -454,7 +460,7 @@ impl GscClient {
 
     fn upload_file(&self, src: &Path, dst: &RemotePattern) -> Result<()> {
         let src_file     = std::fs::File::open(&src)?;
-        let encoded_dst  = utf8_percent_encode(&dst.pat, ENCODE_SET);
+        let encoded_dst  = utf8_percent_encode(&dst.name, ENCODE_SET);
         let base_uri     = self.get_uri_for_submission_files(dst.hw)?;
         let uri          = format!{"{}/{}", base_uri, encoded_dst};
         let request      = self.http.put(&uri).body(src_file);
@@ -475,64 +481,24 @@ impl GscClient {
         }
     }
 
-    fn is_okay_to_write(&self, policy: &mut config::OverwritePolicy, dst: &Path) -> Result<bool> {
-        if dst.exists() {
-            self.is_okay_to_overwrite(policy, || dst.display())
+    fn is_okay_to_write_remote<T>(&self,
+                                  policy: &mut config::OverwritePolicy,
+                                  dst: &HwQual<T>) -> Result<bool>
+    where T: Deref<Target = str> {
+        if let Ok(dst_meta) = self.fetch_exact_file_name(dst.hw, &dst.name) {
+            policy.confirm_overwrite(|| dst_meta)
         } else {
             Ok(true)
         }
     }
 
-    fn is_okay_to_overwrite<D, F>(&self, policy: &mut config::OverwritePolicy, dst_thunk: F)
-        -> Result<bool>
-        where D: ::std::fmt::Display,
-              F: FnOnce() -> D {
-
-        use self::config::OverwritePolicy::*;
-
-        match *policy {
-            Always => Ok(true),
-            Never  => Err(ErrorKind::DestinationFileExists(dst_thunk().to_string()))?,
-            Ask    => {
-                let     stdin = io::stdin();
-                let mut input = stdin.lock();
-                let mut buf   = String::with_capacity(2);
-                let     dst   = dst_thunk();
-
-                loop {
-                    print!("File ‘{}’ already exists.\nOverwrite [Y/N/A/C]? ", dst);
-                    io::stdout().flush()?;
-
-                    input.read_line(&mut buf)?;
-
-                    if buf.is_empty() {
-                        std::process::exit(1);
-                    }
-
-                    match buf.chars().flat_map(char::to_lowercase).next() {
-                        Some('y') => return Ok(true),
-                        Some('n') => {
-                            v2!("Skipping ‘{}’.", dst);
-                            return Ok(false);
-                        },
-                        Some('a') => {
-                            *policy = Always;
-                            return Ok(true);
-                        }
-                        Some('c') => std::process::exit(0),
-                        _ => {
-                            ve1!("");
-                            ve1!("Did not understand response. Options are:");
-                            ve1!("   [Y]es, overwrite just this file");
-                            ve1!("   [N]o, do not overwrite this file");
-                            ve1!("   overwrite [A]ll files");
-                            ve1!("   [C]ancel operation and exit");
-                            ve1!("");
-                            buf.clear();
-                        }
-                    }
-                }
-            }
+    fn is_okay_to_write_local(&self,
+                              policy: &mut config::OverwritePolicy,
+                              dst: &Path) -> Result<bool> {
+        if dst.exists() {
+            policy.confirm_overwrite(|| dst.display())
+        } else {
+            Ok(true)
         }
     }
 
@@ -572,7 +538,7 @@ impl GscClient {
     pub fn cat(&self, rpats: &[RemotePattern]) -> Result<()> {
         for rpat in rpats {
             self.try_warn(|| {
-                let files = self.fetch_nonempty_file_list(&rpat)?;
+                let files = self.fetch_nonempty_matching_file_list(&rpat)?;
 
                 if rpat.is_whole_hw() {
                     let mut table   = tabular::Table::new("{:>}  {:<}");
@@ -607,7 +573,7 @@ impl GscClient {
                         let uri          = format!("{}{}", self.config.get_endpoint(), file.uri);
                         let request      = self.http.get(&uri);
                         let mut response = self.send_request(request)?;
-                        response.copy_to(&mut std::io::stdout())?;
+                        response.copy_to(&mut io::stdout())?;
                     }
                 }
 
@@ -699,35 +665,6 @@ impl GscClient {
         Ok(())
     }
 
-    pub fn ls(&self, rpats: &[RemotePattern]) -> Result<()> {
-        for rpat in rpats {
-            self.try_warn(|| {
-                let files = self.fetch_nonempty_file_list(&rpat)?;
-
-                if rpats.len() > 1 {
-                    v1!("{}:", rpat);
-                }
-
-                let mut table = tabular::Table::new("{:>}  {:<}  [{:<}] {:<}");
-
-                for file in &files {
-                    table.add_row(
-                        tabular::Row::new()
-                            .with_cell(file.byte_count.separate_with_commas())
-                            .with_cell(&file.upload_time)
-                            .with_cell(file.purpose.to_char())
-                            .with_cell(&file.name));
-                }
-
-                v1!("{}", table);
-
-                Ok(())
-            });
-        }
-
-        Ok(())
-    }
-
     pub fn partner(&self) -> Result<()> {
         let (user, cookie) = self.load_credentials()?;
         let uri            = self.user_uri(&user);
@@ -786,7 +723,7 @@ impl GscClient {
     pub fn rm(&self, pats: &[RemotePattern]) -> Result<()> {
         for rpat in pats {
             self.try_warn(|| {
-                let files = self.fetch_nonempty_file_list(&rpat)?;
+                let files = self.fetch_nonempty_matching_file_list(&rpat)?;
 
                 for file in files {
                     let uri          = format!("{}{}", self.config.get_endpoint(), file.uri);
@@ -913,12 +850,30 @@ impl GscClient {
 
     // Helper methods
 
-    fn fetch_file_list(&self, rpat: &RemotePattern) -> Result<Vec<messages::FileMeta>>
+    fn fetch_raw_file_list(&self, hw: usize) -> Result<reqwest::Response>
     {
-        let matcher      = glob(&rpat.pat)?;
-        let uri          = self.get_uri_for_submission_files(rpat.hw)?;
+        let uri          = self.get_uri_for_submission_files(hw)?;
         let request      = self.http.get(&uri);
-        let mut response = self.send_request(request)?;
+        self.send_request(request)
+    }
+
+    fn fetch_exact_file_name(&self, hw: usize, name: &str) -> Result<messages::FileMeta>
+    {
+        let mut response = self.fetch_raw_file_list(hw)?;
+
+        let files: Vec<messages::FileMeta> = response.json()?;
+
+        files.into_iter()
+            .filter(|file| file.name == name)
+            .next()
+            .ok_or_else(||
+                ErrorKind::NoSuchRemoteFile(RemotePattern::hw_name(hw, name)).into())
+    }
+
+    fn fetch_matching_file_list(&self, rpat: &RemotePattern) -> Result<Vec<messages::FileMeta>>
+    {
+        let matcher      = glob(&rpat.name)?;
+        let mut response = self.fetch_raw_file_list(rpat.hw)?;
 
         let files: Vec<messages::FileMeta> = response.json()?;
 
@@ -927,8 +882,8 @@ impl GscClient {
             .collect())
     }
 
-    fn fetch_nonempty_file_list(&self, rpat: &RemotePattern) -> Result<Vec<messages::FileMeta>> {
-        let result = self.fetch_file_list(rpat)?;
+    fn fetch_nonempty_matching_file_list(&self, rpat: &RemotePattern) -> Result<Vec<messages::FileMeta>> {
+        let result = self.fetch_matching_file_list(rpat)?;
 
         if result.is_empty() {
             Err(ErrorKind::NoSuchRemoteFile(rpat.clone()))?
@@ -937,9 +892,9 @@ impl GscClient {
         }
     }
 
-    fn fetch_one_filename(&self, rpat: &RemotePattern) -> Result<messages::FileMeta>
+    fn fetch_one_matching_filename(&self, rpat: &RemotePattern) -> Result<messages::FileMeta>
     {
-        let mut files = self.fetch_file_list(rpat)?;
+        let mut files = self.fetch_matching_file_list(rpat)?;
 
         match files.len() {
             0 => Err(ErrorKind::NoSuchRemoteFile(rpat.clone()))?,
@@ -1177,29 +1132,3 @@ fn soft_create_dir(path: &Path) -> Result<()> {
         }
     }
 }
-
-impl RemotePattern {
-    pub fn is_whole_hw(&self) -> bool {
-        self.pat.is_empty()
-    }
-
-    pub fn with_pat(&self, pat: &str) -> Self {
-        RemotePattern { hw: self.hw, pat: pat.to_owned(), }
-    }
-}
-
-impl CpArg {
-    pub fn is_whole_hw(&self) -> bool {
-        match self {
-            CpArg::Local(_)     => false,
-            CpArg::Remote(rpat) => rpat.is_whole_hw(),
-        }
-    }
-}
-
-impl std::fmt::Display for RemotePattern {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "hw{}:{}", self.hw, self.pat)
-    }
-}
-

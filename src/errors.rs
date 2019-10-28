@@ -131,16 +131,31 @@ error_chain! {
     }
 }
 
-pub fn syntax_error<S1: Into<String>, S2: Into<String>>(class: S1, thing: S2) -> ErrorKind {
-    ErrorKind::SyntaxError(class.into(), thing.into())
+impl ErrorKind {
+    pub fn syntax(class: impl Into<String>, thing: impl Into<String>) -> Self {
+        Self::SyntaxError(class.into(), thing.into())
+    }
+
+    pub fn dest_pat_is_multiple(rpat: &RemotePattern,
+                                rfile_metas: &[super::messages::FileMeta]) -> Self {
+
+        let rfiles = RemoteFiles(rfile_metas.iter().map(|meta| meta.name.clone()).collect());
+        ErrorKind::DestinationPatternIsMultiple(rpat.clone(), rfiles)
+    }
 }
 
-pub fn dest_pat_is_multiple(rpat: &RemotePattern,
-                            rfile_metas: &[super::messages::FileMeta]) -> Error {
+impl Error {
+    pub fn syntax(class: impl Into<String>, thing: impl Into<String>) -> Self {
+        ErrorKind::syntax(class, thing).into()
+    }
 
-    let rfiles = RemoteFiles(rfile_metas.iter().map(|meta| meta.name.clone()).collect());
-    ErrorKind::DestinationPatternIsMultiple(rpat.clone(), rfiles).into()
+    pub fn dest_pat_is_multiple(rpat: &RemotePattern,
+                                rfile_metas: &[super::messages::FileMeta]) -> Self {
+
+        ErrorKind::dest_pat_is_multiple(rpat, rfile_metas).into()
+    }
 }
+
 
 impl std::fmt::Display for RemoteFiles {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

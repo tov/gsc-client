@@ -10,6 +10,7 @@ pub enum EvalType {
     Scale,
     Informational,
 }
+
 #[derive(Deserialize, Debug)]
 pub struct EvalShort {
     pub uri:            String,
@@ -72,12 +73,20 @@ pub struct GraderEval {
 
 #[derive(Deserialize, Debug)]
 pub struct FileMeta {
+    #[serde(rename = "assignment_number")]
+    pub hw:                 usize,
     pub byte_count:         usize,
     pub media_type:         String,
     pub name:               String,
     pub purpose:            FilePurpose,
     pub upload_time:        DateTime,
     pub uri:                String,
+}
+
+impl std::fmt::Display for FileMeta {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "hw{}:{}", self.hw, self.name)
+    }
 }
 
 #[derive(Deserialize, Debug)]
@@ -189,7 +198,31 @@ pub struct Submission {
     pub status:             SubmissionStatus,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Default)]
+pub struct FileMetaChange {
+    #[serde(rename = "assignment_number")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hw:                 Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub media_type:         Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name:               Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub purpose:            Option<FilePurpose>,
+    pub overwrite:          bool,
+}
+
+impl std::fmt::Display for FileMetaChange {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let name = self.name.as_ref().map(String::as_str).unwrap_or("");
+        match self.hw {
+            Some(hw) => write!(f, "hw{}:{}", hw, name),
+            None     => write!(f, ":{}", name)
+        }
+    }
+}
+
+#[derive(Serialize, Debug, Default)]
 pub struct UserChange {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub exam_grades:      Vec<ExamGrade>,
@@ -201,7 +234,7 @@ pub struct UserChange {
     pub role:             Option<UserRole>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Default)]
 pub struct SubmissionChange {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub due_date:           Option<String>,
@@ -271,17 +304,6 @@ impl Submission {
     }
 }
 
-impl Default for SubmissionChange {
-    fn default() -> Self {
-        SubmissionChange {
-            due_date:       None,
-            eval_date:      None,
-            bytes_quota:    None,
-            owner2:         None,
-        }
-    }
-}
-
 impl FilePurpose {
     pub fn to_char(&self) -> char {
         use self::FilePurpose::*;
@@ -304,17 +326,6 @@ impl FilePurpose {
             Config   => ".",
             Resource => "Resources",
             Log      => ".",
-        }
-    }
-}
-
-impl Default for UserChange {
-    fn default() -> Self {
-        UserChange {
-            exam_grades:      Vec::new(),
-            partner_requests: Vec::new(),
-            password:         None,
-            role:             None,
         }
     }
 }

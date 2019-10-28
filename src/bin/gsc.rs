@@ -1,7 +1,5 @@
-use gsc_client::*;
-use gsc_client::errors::{Result, ResultExt, ErrorKind, syntax_error};
-
-use vlog::*;
+use gsc_client::prelude::*;
+use gsc_client::config;
 
 use std::error::Error;
 use std::process::exit;
@@ -46,6 +44,7 @@ enum Command {
     EvalGet {hw: usize, number: usize},
     EvalSet {hw: usize, number: usize, score: f64, explanation: String},
     Ls{rpats: Vec<RemotePattern>},
+    Mv{src: RemotePattern, dst: RemoteDestination},
     Partner,
     PartnerRequest{hw: usize, them: String},
     PartnerAccept{hw: usize, them: String},
@@ -88,6 +87,7 @@ fn do_it() -> Result<bool> {
         EvalSet{hw, number, score, explanation}
                                      => client.set_eval(hw, number, score, &explanation),
         Ls{rpats}                    => client.ls(&rpats),
+        Mv{src, dst}                 => client.mv(&src, &dst),
         Partner                      => client.partner(),
         PartnerRequest{hw, them}     => client.partner_request(hw, &them),
         PartnerAccept{hw, them}      => client.partner_accept(hw, &them),
@@ -109,10 +109,21 @@ fn process_common<'a>(matches: &clap::ArgMatches<'a>, config: &mut config::Confi
     let qs = matches.occurrences_of("QUIET") as isize;
     let verbosity = config.get_verbosity() + vs - qs;
     config.set_verbosity(verbosity);
+    config.set_json_output(matches.is_present("JSON") && !matches.is_present("HUMAN"));
 
     if let Some(user) = matches.value_of("ME") {
         config.set_on_behalf(user.to_owned());
     }
+}
+
+fn process_overwrite_opts<'a>(matches: &clap::ArgMatches<'a>, config: &mut config::Config) {
+    config.set_overwrite_policy(if matches.is_present("ALWAYS") {
+        config::OverwritePolicy::Always
+    } else if matches.is_present("NEVER") {
+        config::OverwritePolicy::Never
+    } else {
+        config::OverwritePolicy::Ask
+    });
 }
 
 impl<'a, 'b> GscClientApp<'a, 'b> {
@@ -137,14 +148,8 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             .subcommand(SubCommand::with_name("cp")
                 .about("Copies files to or from the server")
                 .add_common()
-                .flag("ALL",    "all", "Copy all the files in the specified source homeworks")
-                .flag("ALWAYS", "f",   "Overwrite existing files without asking")
-                .flag("ASK",    "i",   "Ask (interactively) before overwriting existing files")
-                .flag("NEVER",  "n",   "Never overwrite existing files")
-                .group(ArgGroup::with_name("overwrite")
-                    .args(&["ALWAYS", "ASK", "NEVER"])
-                    .multiple(false)
-                    .required(false))
+                .add_overwrite_opts()
+                .flag("ALL", "all", "Copy all the files in the specified source homeworks")
                 .req_args("SRC", "The files to copy")
                 .req_arg("DST", "The destination of the files"))
             .subcommand(SubCommand::with_name("create")
@@ -171,6 +176,12 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 .about("Lists files")
                 .add_common()
                 .req_args("SPEC", "The homeworks or files to list, e.g. ‘hw3’"))
+            .subcommand(SubCommand::with_name("mv")
+                .about("Renames a remote file")
+                .add_common()
+                .add_overwrite_opts()
+                .req_arg("SRC", "The file to rename")
+                .req_arg("DST", "The new name "))
             .subcommand(SubCommand::with_name("partner")
                 .about("Manages partners")
                 .add_common()
@@ -299,13 +310,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             process_common(submatches, config);
             let all       = submatches.is_present("ALL");
 
-            config.set_overwrite_policy(if submatches.is_present("ALWAYS") {
-                config::OverwritePolicy::Always
-            } else if submatches.is_present("NEVER") {
-                config::OverwritePolicy::Never
-            } else {
-                config::OverwritePolicy::Ask
-            });
+            process_overwrite_opts(&submatches, config);
 
             let mut srcs  = Vec::new();
             let dst       = parse_cp_arg(submatches.value_of("DST").unwrap())?;
@@ -350,9 +355,10 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 panic!("No other eval commands");
             }
         }
+
         else if let Some(submatches) = matches.subcommand_matches("ls") {
             process_common(submatches, config);
-            
+
             let ls_specs   = submatches.values_of("SPEC").unwrap();
             let mut rpats = Vec::new();
 
@@ -361,6 +367,16 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             }
 
             Ok(Command::Ls{rpats})
+        }
+
+        else if let Some(submatches) = matches.subcommand_matches("mv") {
+            process_common(submatches, config);
+            process_overwrite_opts(submatches, config);
+
+            let src = parse_hw_file(submatches.value_of("SRC").unwrap())?;
+            let dst = parse_remote_dest(submatches.value_of("DST").unwrap())?;
+
+            Ok(Command::Mv{src, dst})
         }
 
         else if let Some(submatches) = matches.subcommand_matches("partner") {
@@ -433,6 +449,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
 trait AppExt {
     fn add_admin(self) -> Self;
     fn add_common(self) -> Self;
+    fn add_overwrite_opts(self) -> Self;
     fn add_partner_args(self) -> Self;
     fn add_user_opt(self) -> Self;
 
@@ -526,7 +543,28 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
                 .multiple(true)
                 .takes_value(false)
                 .help("Makes the output quieter"))
+            .arg(clap::Arg::with_name("JSON")
+                .short("j")
+                .long("json")
+                .takes_value(false)
+                .help("Show raw JSON response"))
+            .arg(clap::Arg::with_name("HUMAN")
+                .short("H")
+                .long("human")
+                .takes_value(false)
+                .help("Show human-formatted result (overrides --json)"))
             .add_user_opt()
+    }
+
+    fn add_overwrite_opts(self) -> Self {
+        self
+            .flag("ALWAYS", "f",   "Overwrite existing files without asking")
+            .flag("ASK",    "i",   "Ask (interactively) before overwriting existing files")
+            .flag("NEVER",  "n",   "Never overwrite existing files")
+            .group(clap::ArgGroup::with_name("overwrite")
+                .args(&["ALWAYS", "ASK", "NEVER"])
+                .multiple(false)
+                .required(false))
     }
 
     fn add_partner_args(self) -> Self {
@@ -609,7 +647,7 @@ impl ParseWithDescription for str {
     fn parse_descr<F: FromStr>(&self, descr: &str) -> Result<F>
         where <F as FromStr>::Err: std::error::Error + Send + 'static
     {
-        self.parse().chain_err(|| syntax_error(descr, self))
+        self.parse().chain_err(|| ErrorKind::syntax(descr, self))
     }
 }
 
@@ -619,33 +657,49 @@ fn parse_hw(spec: &str) -> Result<usize> {
         .and_then(|s| s.as_str().parse().ok()) {
         Ok(i)
     } else {
-        Err(syntax_error("homework spec", spec))?
+        Err(ErrorKind::syntax("homework spec", spec))?
     }
 }
 
 fn parse_hw_opt_file(spec: &str) -> Result<RemotePattern> {
     let captures  = re::HW_OPT_FILE.captures(spec)
-        .ok_or_else(|| syntax_error("homework or file spec", spec))?;
+        .ok_or_else(|| ErrorKind::syntax("homework or file spec", spec))?;
     let capture1  = captures.get(1).unwrap().as_str();
     let capture2  = captures.get(2).map(|c| c.as_str());
     let hw        = capture1.parse().unwrap();
-    let pat       = capture2.unwrap_or("").to_owned();
-    Ok(RemotePattern{hw, pat})
+    let name      = capture2.unwrap_or("").to_owned();
+    Ok(RemotePattern{hw, name})
 }
 
 fn parse_hw_file(file_spec: &str) -> Result<RemotePattern> {
     let captures  = re::HW_FILE.captures(file_spec)
-        .ok_or_else(|| syntax_error("remote file or homework spec", file_spec))?;
+        .ok_or_else(|| ErrorKind::syntax("remote file or homework spec", file_spec))?;
     let capture1  = captures.get(1).unwrap().as_str();
     let capture2  = captures.get(2).unwrap().as_str();
     let hw        = capture1.parse().unwrap();
-    let pat       = capture2.to_owned();
-    Ok(RemotePattern{hw, pat})
+    let name      = capture2.to_owned();
+    Ok(RemotePattern{hw, name})
+}
+
+fn parse_remote_dest(spec: &str) -> Result<RemoteDestination> {
+    if spec.is_empty() {
+        Err(ErrorKind::syntax("remote file or assignment name", spec))?;
+    }
+
+    let result = if let Ok(hw) = parse_hw(spec) {
+        RemoteDestination::just_hw(hw)
+    } else if spec.find(':').is_some() {
+        parse_hw_file(spec)?.into()
+    } else {
+        RemoteDestination::just_name(spec)
+    };
+
+    Ok(result)
 }
 
 fn parse_cp_arg(spec: &str) -> Result<CpArg> {
     if spec.is_empty() {
-        Err(syntax_error("file name", spec))?
+        Err(ErrorKind::syntax("file name", spec))?
     } else if let Some(captures) = re::LOCAL_FILE.captures(spec) {
         let filename = captures.get(1).unwrap().as_str().to_owned();
         Ok(CpArg::Local(filename.into()))

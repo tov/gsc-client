@@ -1,8 +1,11 @@
-use std::env;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::{env,
+          fmt,
+          fs,
+          io::{self, BufRead, Write},
+          path::{Path, PathBuf},
+};
 
-use super::errors::*;
+use super::prelude::*;
 
 use serde_derive::Deserialize;
 use serde_yaml;
@@ -23,9 +26,10 @@ pub struct Config {
     on_behalf:   Option<String>,
     overwrite:   OverwritePolicy,
     verbosity:   isize,
+    json_output: bool,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum OverwritePolicy {
     Always,
     Never,
@@ -68,6 +72,7 @@ impl Config {
             on_behalf:   None,
             overwrite:   OverwritePolicy::Ask,
             verbosity:   1,
+            json_output: false,
         }
     }
 
@@ -105,6 +110,14 @@ impl Config {
         self.verbosity = verbosity;
     }
 
+    pub fn json_output(&self) -> bool {
+        self.json_output
+    }
+
+    pub fn set_json_output(&mut self, json_output: bool) {
+        self.json_output = json_output;
+    }
+
     pub fn get_endpoint(&self) -> &str {
         &self.endpoint
     }
@@ -129,7 +142,7 @@ impl Config {
         let contents     = match fs::read_to_string(dotfile_name) {
             Ok(contents)   => contents,
             Err(error)     => match error.kind() {
-                std::io::ErrorKind::NotFound => return Ok(None),
+                io::ErrorKind::NotFound => return Ok(None),
                 _ => {
                     let message = format!("Could not read dotfile: {}", dotfile_name.display());
                     return Err(Error::with_chain(error, message));
@@ -158,4 +171,55 @@ impl Config {
     }
 }
 
+impl OverwritePolicy {
+    pub fn confirm_overwrite<D: fmt::Display, F: FnOnce() -> D>(
+        &mut self, dst_thunk: F) -> Result<bool> {
 
+        use OverwritePolicy::*;
+
+        match *self {
+            Always => Ok(true),
+            Never  => Err(ErrorKind::DestinationFileExists(dst_thunk().to_string()))?,
+            Ask    => {
+                let     stdin = io::stdin();
+                let mut input = stdin.lock();
+                let mut buf   = String::with_capacity(2);
+                let     dst   = dst_thunk();
+
+                loop {
+                    print!("File ‘{}’ already exists.\nOverwrite [Y/N/A/C]? ", dst);
+                    io::stdout().flush()?;
+
+                    input.read_line(&mut buf)?;
+
+                    if buf.is_empty() {
+                        std::process::exit(1);
+                    }
+
+                    match buf.chars().flat_map(char::to_lowercase).next() {
+                        Some('y') => return Ok(true),
+                        Some('n') => {
+                            v2!("Skipping ‘{}’.", dst);
+                            return Ok(false);
+                        },
+                        Some('a') => {
+                            *self = Always;
+                            return Ok(true);
+                        }
+                        Some('c') => std::process::exit(0),
+                        _ => {
+                            ve1!("");
+                            ve1!("Did not understand response. Options are:");
+                            ve1!("   [Y]es, overwrite just this file");
+                            ve1!("   [N]o, do not overwrite this file");
+                            ve1!("   overwrite [A]ll files");
+                            ve1!("   [C]ancel operation and exit");
+                            ve1!("");
+                            buf.clear();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
