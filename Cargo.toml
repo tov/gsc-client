@@ -12,7 +12,7 @@ chrono = { version = "0.4", features = ["serde"] }
 clap = "2.32.0"
 error-chain = "0.12.1"
 fs2 = "0.4.3"
-globset = "0.4.2"
+globset = "0.4.4"
 lazy_static = "1.1"
 percent-encoding = "1.0.1"
 regex = "1.0"
