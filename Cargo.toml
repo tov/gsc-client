@@ -9,7 +9,7 @@ admin = []
 
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
-clap = "2.32.0"
+clap = "2.33.0"
 error-chain = "0.12.1"
 fs2 = "0.4.3"
 globset = "0.4.2"
