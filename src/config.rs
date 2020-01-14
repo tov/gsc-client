@@ -9,7 +9,7 @@ use super::prelude::*;
 use serde_derive::Deserialize;
 use serde_yaml;
 
-const API_ENDPOINT: &str = "https://stewie.cs.northwestern.edu";
+const API_ENDPOINT: &str = "https://cs211.cs.northwestern.edu";
 
 const AUTHFILE_VAR: &str = "GSC_AUTH_FILE";
 const AUTHFILE_NAME: &str = ".gscauth";
