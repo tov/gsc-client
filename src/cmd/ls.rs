@@ -5,7 +5,7 @@ impl GscClient {
         for rpat in rpats {
             assert!(rpat.name.is_empty(), "not handled");
 
-            let mut response = self.fetch_raw_file_list(rpat.hw)?;
+            let response = self.fetch_raw_file_list(rpat.hw)?;
             let json = response.text()?;
             v1!("{}", json);
         }
