@@ -10,12 +10,12 @@ use super::prelude::*;
 use serde_derive::Deserialize;
 use serde_yaml;
 
-const API_ENDPOINT: &str = "https://stewie.cs.northwestern.edu";
+const API_ENDPOINT: &str    = "https://stewie.cs.northwestern.edu";
 
-const COOKIEFILE_VAR: &str  = "GSC_LOGIN";
-const COOKIEFILE_NAME: &str = ".gsclogin";
+const AUTHFILE_VAR: &str    = "GSC_AUTH";
+const AUTHFILE_NAME: &str   = ".gscauth";
 
-const DOTFILE_VAR: &str     = "GSC_DOTFILE";
+const DOTFILE_VAR: &str     = "GSC_RC";
 const DOTFILE_NAME: &str    = ".gscrc";
 
 #[derive(Debug)]
@@ -62,7 +62,7 @@ fn find_dotfile(env_var: &str, filename: &str) -> Option<PathBuf> {
 
 impl Config {
     pub fn new() -> Self {
-        let cookie_file = find_dotfile(COOKIEFILE_VAR, COOKIEFILE_NAME);
+        let cookie_file = find_dotfile(AUTHFILE_VAR, AUTHFILE_NAME);
         let dotfile     = find_dotfile(DOTFILE_VAR, DOTFILE_NAME);
 
         Config {
