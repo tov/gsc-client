@@ -1,5 +1,5 @@
-use textwrap;
 use std::fmt::{Display, Formatter, Result};
+use textwrap;
 
 pub struct Percentage(pub f64);
 
@@ -13,6 +13,5 @@ const HANGING_INDENT: &str = "    ";
 
 pub fn hanging(text: &str) -> String {
     let width = textwrap::termwidth() - HANGING_INDENT.len();
-    textwrap::indent(&textwrap::fill(text, width),
-                     HANGING_INDENT)
+    textwrap::indent(&textwrap::fill(text, width), HANGING_INDENT)
 }

@@ -4,19 +4,19 @@ use std::{
     path::PathBuf,
 };
 
-use crate::prelude::*;
 use super::traits::FileName;
+use crate::prelude::*;
 
 pub type RemoteDestination = HwOptQual<String>;
-pub type RemotePattern     = HwQual<String>;
+pub type RemotePattern = HwQual<String>;
 
-pub type HwQual<T>         = HwQualBase<usize, T>;
-pub type HwOptQual<T>      = HwQualBase<Option<usize>, T>;
+pub type HwQual<T> = HwQualBase<usize, T>;
+pub type HwOptQual<T> = HwQualBase<Option<usize>, T>;
 
 #[derive(Clone, Debug)]
 pub struct HwQualBase<H, N> {
-    pub hw:     H,
-    pub name:   N,
+    pub hw: H,
+    pub name: N,
 }
 
 pub enum CpArg {
@@ -30,7 +30,10 @@ impl<T: FileName> RemotePath for HwOptQual<T> {
     type Unqual = HwOptQual<T>;
 
     fn hw_name(hw: usize, name: impl Into<Self::Name>) -> Self {
-        Self { hw: Some(hw), name: name.into(), }
+        Self {
+            hw: Some(hw),
+            name: name.into(),
+        }
     }
 
     fn opt_hw(&self) -> Option<usize> {
@@ -54,20 +57,27 @@ impl<T: FileName> RemotePath for HwOptQual<T> {
 }
 
 fn non_empty<S: Deref<Target = str>>(s: S) -> Option<S> {
-    if s.is_empty() { None } else { Some(s) }
+    if s.is_empty() {
+        None
+    } else {
+        Some(s)
+    }
 }
 
 impl<T: FileName> Unqualified for HwOptQual<T> {
     fn opt_hw_name(hw: Option<usize>, name: impl Into<Self::Name>) -> Self {
-        Self { hw, name: name.into() }
+        Self {
+            hw,
+            name: name.into(),
+        }
     }
 
     fn unwrap_or(self, default: Self::Qual) -> Self::Qual {
         match (self.hw, non_empty(self.name)) {
             (Some(hw), Some(name)) => Self::Qual::hw_name(hw, name),
-            (Some(hw), None)       => Self::Qual::hw_name(hw, default.name),
-            (None,     Some(name)) => Self::Qual::hw_name(default.hw, name),
-            (None,     None)       => panic!("HwOptQual::unwrap_or: got nothing"),
+            (Some(hw), None) => Self::Qual::hw_name(hw, default.name),
+            (None, Some(name)) => Self::Qual::hw_name(default.hw, name),
+            (None, None) => panic!("HwOptQual::unwrap_or: got nothing"),
         }
     }
 }
@@ -78,7 +88,10 @@ impl<T: FileName> RemotePath for HwQual<T> {
     type Unqual = HwOptQual<T>;
 
     fn hw_name(hw: usize, name: impl Into<Self::Name>) -> Self {
-        Self { hw, name: name.into() }
+        Self {
+            hw,
+            name: name.into(),
+        }
     }
 
     fn opt_hw(&self) -> Option<usize> {
@@ -110,7 +123,7 @@ impl<T: FileName> Qualified for HwQual<T> {
 impl CpArg {
     pub fn is_whole_hw(&self) -> bool {
         match self {
-            CpArg::Local(_)     => false,
+            CpArg::Local(_) => false,
             CpArg::Remote(rpat) => rpat.is_whole_hw(),
         }
     }
@@ -150,9 +163,8 @@ impl<T> From<HwQualBase<T, &str>> for HwQualBase<T, String> {
 impl<T, U: From<T>> From<HwQual<T>> for HwOptQual<U> {
     fn from(rp: HwQual<T>) -> Self {
         HwOptQual {
-            hw:   Some(rp.hw),
+            hw: Some(rp.hw),
             name: rp.name.into(),
         }
     }
 }
-

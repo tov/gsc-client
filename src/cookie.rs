@@ -1,19 +1,19 @@
 use fs2::FileExt;
 use reqwest::header::HeaderValue;
-use vlog::*;
-use std::io::{BufRead, Seek, Write};
 use std::fs::File;
+use std::io::{BufRead, Seek, Write};
 use std::path::Path;
+use vlog::*;
 
 use super::errors::*;
 
 #[derive(Debug)]
 pub struct CookieFile {
-    file:       File,
-    dirty:      bool,
-    key:        String,
-    value:      String,
-    username:   String,
+    file: File,
+    dirty: bool,
+    key: String,
+    value: String,
+    username: String,
 }
 
 impl Drop for CookieFile {
@@ -31,10 +31,16 @@ impl Drop for CookieFile {
 }
 
 fn parse_cookie_file(contents: &str) -> Option<(&str, &str, &str)> {
-    let colon    = contents.find(':')?;
-    let equals   = contents.find('=')?;
-    if colon > equals { return None; }
-    Some((&contents[.. colon], &contents[colon + 1 .. equals], &contents[equals + 1 ..]))
+    let colon = contents.find(':')?;
+    let equals = contents.find('=')?;
+    if colon > equals {
+        return None;
+    }
+    Some((
+        &contents[..colon],
+        &contents[colon + 1..equals],
+        &contents[equals + 1..],
+    ))
 }
 
 impl CookieFile {
@@ -47,10 +53,10 @@ impl CookieFile {
 
         Ok(CookieFile {
             file,
-            dirty:      false,
-            username:   username.to_owned(),
-            key:        String::new(),
-            value:      String::new(),
+            dirty: false,
+            username: username.to_owned(),
+            key: String::new(),
+            value: String::new(),
         })
     }
 
@@ -63,20 +69,20 @@ impl CookieFile {
         file.lock_exclusive()?;
 
         let mut buf_reader = std::io::BufReader::new(file);
-        let mut buf        = String::new();
-        let _              = buf_reader.read_line(&mut buf);
+        let mut buf = String::new();
+        let _ = buf_reader.read_line(&mut buf);
 
         file = buf_reader.into_inner();
 
-        let (username, key, value) = parse_cookie_file(buf.trim_end())
-            .ok_or(ErrorKind::LoginPlease)?;
+        let (username, key, value) =
+            parse_cookie_file(buf.trim_end()).ok_or(ErrorKind::LoginPlease)?;
 
         Ok(CookieFile {
             file,
-            dirty:      false,
-            username:   username.to_owned(),
-            key:        key.to_owned(),
-            value:      value.to_owned(),
+            dirty: false,
+            username: username.to_owned(),
+            key: key.to_owned(),
+            value: value.to_owned(),
         })
     }
 
@@ -90,7 +96,7 @@ impl CookieFile {
     }
 
     pub fn set_cookie(&mut self, key: String, value: String) {
-        self.key   = key;
+        self.key = key;
         self.value = value;
         self.dirty = true;
     }
@@ -118,4 +124,3 @@ impl CookieFile {
         Ok(())
     }
 }
-

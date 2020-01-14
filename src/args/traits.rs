@@ -1,10 +1,9 @@
-use std::ops::Deref;
 use crate::prelude::*;
+use std::ops::Deref;
 
-pub trait FileName: Sized + Default + Deref<Target = str> + Into<String> { }
+pub trait FileName: Sized + Default + Deref<Target = str> + Into<String> {}
 
-impl<T> FileName for T
-where T: Sized + Default + Deref<Target = str> + Into<String> { }
+impl<T> FileName for T where T: Sized + Default + Deref<Target = str> + Into<String> {}
 
 pub trait RemotePath: Sized {
     type Name: FileName;
@@ -50,4 +49,3 @@ pub trait Qualified: RemotePath<Qual = Self> {
         }
     }
 }
-

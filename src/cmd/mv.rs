@@ -1,12 +1,12 @@
-use crate::prelude::*;
 use crate::messages::FileMetaChange;
+use crate::prelude::*;
 
 impl GscClient {
     pub fn mv(&self, src: &RemotePattern, part_dst: &RemoteDestination) -> Result<()> {
         self.try_warn(|| {
-            let     src = self.fetch_one_matching_filename(src)?;
+            let src = self.fetch_one_matching_filename(src)?;
             let mut dst = HwQual {
-                hw:   src.hw,
+                hw: src.hw,
                 name: src.name.as_str(),
             };
 
@@ -14,7 +14,7 @@ impl GscClient {
 
             if let Some(hw) = part_dst.hw {
                 if hw != dst.hw {
-                    dst.hw     = hw;
+                    dst.hw = hw;
                     message.hw = Some(hw);
                 }
             }
@@ -36,8 +36,8 @@ impl GscClient {
                 return Ok(());
             }
 
-            let uri      = format!("{}{}", self.config.get_endpoint(), src.uri);
-            let request  = self.http.patch(&uri).json(&message);
+            let uri = format!("{}{}", self.config.get_endpoint(), src.uri);
+            let request = self.http.patch(&uri).json(&message);
             v2!("Moving remote file ‘{}’ to ‘{}’...", src, dst);
             self.send_request(request)?;
 

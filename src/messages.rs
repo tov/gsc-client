@@ -1,4 +1,4 @@
-use serde_derive::{Serialize, Deserialize};
+use serde_derive::{Deserialize, Serialize};
 
 #[derive(Clone, Deserialize, Debug)]
 pub struct DateTime(chrono::DateTime<chrono::offset::FixedOffset>);
@@ -13,35 +13,35 @@ pub enum EvalType {
 
 #[derive(Deserialize, Debug)]
 pub struct EvalShort {
-    pub uri:            String,
-    pub sequence:       usize,
+    pub uri: String,
+    pub sequence: usize,
     pub submission_uri: String,
     #[serde(rename = "type")]
-    pub eval_type:      EvalType,
+    pub eval_type: EvalType,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct Eval {
-    pub uri:            String,
-    pub sequence:       usize,
+    pub uri: String,
+    pub sequence: usize,
     pub submission_uri: String,
     #[serde(rename = "type")]
-    pub eval_type:      EvalType,
-    pub prompt:         String,
-    pub value:          f64,
+    pub eval_type: EvalType,
+    pub prompt: String,
+    pub value: f64,
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub self_eval:      Option<SelfEval>,
+    pub self_eval: Option<SelfEval>,
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub grader_eval:    Option<GraderEval>,
+    pub grader_eval: Option<GraderEval>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct ExamGrade {
-    pub number:             usize,
-    pub points:             usize,
-    pub possible:           usize,
+    pub number: usize,
+    pub points: usize,
+    pub possible: usize,
 }
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -64,23 +64,23 @@ pub enum GraderEvalStatus {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct GraderEval {
-    pub uri:            String,
-    pub grader:         String,
-    pub score:          f64,
-    pub explanation:    String,
-    pub status:         GraderEvalStatus,
+    pub uri: String,
+    pub grader: String,
+    pub score: f64,
+    pub explanation: String,
+    pub status: GraderEvalStatus,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct FileMeta {
     #[serde(rename = "assignment_number")]
-    pub hw:                 usize,
-    pub byte_count:         usize,
-    pub media_type:         String,
-    pub name:               String,
-    pub purpose:            FilePurpose,
-    pub upload_time:        DateTime,
-    pub uri:                String,
+    pub hw: usize,
+    pub byte_count: usize,
+    pub media_type: String,
+    pub name: String,
+    pub purpose: FilePurpose,
+    pub upload_time: DateTime,
+    pub uri: String,
 }
 
 impl std::fmt::Display for FileMeta {
@@ -108,9 +108,9 @@ pub enum PartnerRequestStatus {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PartnerRequest {
-    pub assignment_number:  usize,
-    pub user:               String,
-    pub status:             PartnerRequestStatus,
+    pub assignment_number: usize,
+    pub user: String,
+    pub status: PartnerRequestStatus,
 }
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -123,27 +123,27 @@ pub enum UserRole {
 
 #[derive(Deserialize, Debug)]
 pub struct UserShort {
-    pub name:               String,
-    pub uri:                String,
+    pub name: String,
+    pub uri: String,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct User {
-    pub name:               String,
-    pub uri:                String,
-    pub submissions_uri:    String,
-    pub role:               UserRole,
-    pub exam_grades:        Vec<ExamGrade>,
-    pub partner_requests:   Vec<PartnerRequest>,
-    pub submissions:        Vec<SubmissionShort>,
+    pub name: String,
+    pub uri: String,
+    pub submissions_uri: String,
+    pub role: UserRole,
+    pub exam_grades: Vec<ExamGrade>,
+    pub partner_requests: Vec<PartnerRequest>,
+    pub submissions: Vec<SubmissionShort>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SelfEval {
-    pub uri:                String,
-    pub score:              f64,
-    pub explanation:        String,
-    pub permalink:          String,
+    pub uri: String,
+    pub score: f64,
+    pub explanation: String,
+    pub permalink: String,
 }
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -167,49 +167,49 @@ pub enum SubmissionEvalStatus {
 
 #[derive(Deserialize, Debug)]
 pub struct SubmissionShort {
-    pub assignment_number:  usize,
-    pub id:                 usize,
-    pub uri:                String,
-    pub status:             SubmissionStatus,
-    pub grade:              f64,
-    pub owner1:             UserShort,
+    pub assignment_number: usize,
+    pub id: usize,
+    pub uri: String,
+    pub status: SubmissionStatus,
+    pub grade: f64,
+    pub owner1: UserShort,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub owner2:             Option<UserShort>,
+    pub owner2: Option<UserShort>,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct Submission {
-    pub assignment_number:  usize,
-    pub id:                 usize,
-    pub uri:                String,
-    pub grade:              f64,
-    pub files_uri:          String,
-    pub evals_uri:          String,
-    pub owner1:             UserShort,
+    pub assignment_number: usize,
+    pub id: usize,
+    pub uri: String,
+    pub grade: f64,
+    pub files_uri: String,
+    pub evals_uri: String,
+    pub owner1: UserShort,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub owner2:             Option<UserShort>,
-    pub bytes_used:         usize,
-    pub bytes_quota:        usize,
-    pub open_date:          DateTime,
-    pub due_date:           DateTime,
-    pub eval_date:          DateTime,
-    pub last_modified:      DateTime,
-    pub eval_status:        SubmissionEvalStatus,
-    pub status:             SubmissionStatus,
+    pub owner2: Option<UserShort>,
+    pub bytes_used: usize,
+    pub bytes_quota: usize,
+    pub open_date: DateTime,
+    pub due_date: DateTime,
+    pub eval_date: DateTime,
+    pub last_modified: DateTime,
+    pub eval_status: SubmissionEvalStatus,
+    pub status: SubmissionStatus,
 }
 
 #[derive(Serialize, Debug, Default)]
 pub struct FileMetaChange {
     #[serde(rename = "assignment_number")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub hw:                 Option<usize>,
+    pub hw: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub media_type:         Option<String>,
+    pub media_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub name:               Option<String>,
+    pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub purpose:            Option<FilePurpose>,
-    pub overwrite:          bool,
+    pub purpose: Option<FilePurpose>,
+    pub overwrite: bool,
 }
 
 impl std::fmt::Display for FileMetaChange {
@@ -217,7 +217,7 @@ impl std::fmt::Display for FileMetaChange {
         let name = self.name.as_ref().map(String::as_str).unwrap_or("");
         match self.hw {
             Some(hw) => write!(f, "hw{}:{}", hw, name),
-            None     => write!(f, ":{}", name)
+            None => write!(f, ":{}", name),
         }
     }
 }
@@ -225,25 +225,25 @@ impl std::fmt::Display for FileMetaChange {
 #[derive(Serialize, Debug, Default)]
 pub struct UserChange {
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub exam_grades:      Vec<ExamGrade>,
+    pub exam_grades: Vec<ExamGrade>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub partner_requests: Vec<PartnerRequest>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub password:         Option<String>,
+    pub password: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub role:             Option<UserRole>,
+    pub role: Option<UserRole>,
 }
 
 #[derive(Serialize, Debug, Default)]
 pub struct SubmissionChange {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub due_date:           Option<String>,
+    pub due_date: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub eval_date:          Option<String>,
+    pub eval_date: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bytes_quota:        Option<usize>,
+    pub bytes_quota: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub owner2:             Option<()>,
+    pub owner2: Option<()>,
 }
 
 impl std::fmt::Display for DateTime {
@@ -256,21 +256,21 @@ impl SubmissionStatus {
     fn to_str(&self) -> &'static str {
         use self::SubmissionStatus::*;
         match *self {
-            Future       => "future",
-            Open         => "open for submission",
-            SelfEval     => "open for self evaluation",
-            Extended     => "open for submission (extended)",
+            Future => "future",
+            Open => "open for submission",
+            SelfEval => "open for self evaluation",
+            Extended => "open for submission (extended)",
             ExtendedEval => "open for self evaluation (extended)",
-            Closed       => "closed",
+            Closed => "closed",
         }
     }
 
     pub fn is_self_eval(&self) -> bool {
         use self::SubmissionStatus::*;
         match *self {
-            SelfEval     => true,
+            SelfEval => true,
             ExtendedEval => true,
-            _            => false,
+            _ => false,
         }
     }
 }
@@ -285,8 +285,8 @@ impl SubmissionEvalStatus {
     fn to_str(&self) -> &'static str {
         use self::SubmissionEvalStatus::*;
         match *self {
-            Empty    => "empty",
-            Started  => "started",
+            Empty => "empty",
+            Started => "started",
             Complete => "complete",
         }
     }
@@ -309,11 +309,11 @@ impl FilePurpose {
         use self::FilePurpose::*;
 
         match self {
-            Source   => 's',
-            Test     => 't',
-            Config   => 'c',
+            Source => 's',
+            Test => 't',
+            Config => 'c',
             Resource => 'r',
-            Log      => 'l',
+            Log => 'l',
         }
     }
 
@@ -321,12 +321,11 @@ impl FilePurpose {
         use self::FilePurpose::*;
 
         match self {
-            Source   => "src",
-            Test     => "test",
-            Config   => ".",
+            Source => "src",
+            Test => "test",
+            Config => ".",
             Resource => "Resources",
-            Log      => ".",
+            Log => ".",
         }
     }
 }
-

@@ -1,8 +1,7 @@
-use std::{env,
-          fmt,
-          fs,
-          io::{self, BufRead, Write},
-          path::{Path, PathBuf},
+use std::{
+    env, fmt, fs,
+    io::{self, BufRead, Write},
+    path::{Path, PathBuf},
 };
 
 use super::prelude::*;
@@ -10,22 +9,22 @@ use super::prelude::*;
 use serde_derive::Deserialize;
 use serde_yaml;
 
-const API_ENDPOINT: &str    = "https://stewie.cs.northwestern.edu";
+const API_ENDPOINT: &str = "https://stewie.cs.northwestern.edu";
 
-const AUTHFILE_VAR: &str    = "GSC_AUTH";
-const AUTHFILE_NAME: &str   = ".gscauth";
+const AUTHFILE_VAR: &str = "GSC_AUTH";
+const AUTHFILE_NAME: &str = ".gscauth";
 
-const DOTFILE_VAR: &str     = "GSC_RC";
-const DOTFILE_NAME: &str    = ".gscrc";
+const DOTFILE_VAR: &str = "GSC_RC";
+const DOTFILE_NAME: &str = ".gscrc";
 
 #[derive(Debug)]
 pub struct Config {
     cookie_file: Option<PathBuf>,
-    dotfile:     Option<PathBuf>,
-    endpoint:    String,
-    on_behalf:   Option<String>,
-    overwrite:   OverwritePolicy,
-    verbosity:   isize,
+    dotfile: Option<PathBuf>,
+    endpoint: String,
+    on_behalf: Option<String>,
+    overwrite: OverwritePolicy,
+    verbosity: isize,
     json_output: bool,
 }
 
@@ -41,37 +40,37 @@ pub enum OverwritePolicy {
 #[serde(deny_unknown_fields)]
 pub struct Dotfile {
     #[serde(default)]
-    pub endpoint:   String,
+    pub endpoint: String,
     #[serde(default)]
-    pub verbosity:  Option<isize>,
+    pub verbosity: Option<isize>,
 }
 
 fn find_dotfile(env_var: &str, filename: &str) -> Option<PathBuf> {
     match env::var_os(env_var) {
         Some(file) => Some(PathBuf::from(file)),
-        None       => match env::var_os("HOME") {
+        None => match env::var_os("HOME") {
             Some(home) => {
                 let mut buf = PathBuf::from(home);
                 buf.push(filename);
                 Some(buf)
-            },
-            None       => None,
-        }
+            }
+            None => None,
+        },
     }
 }
 
 impl Config {
     pub fn new() -> Self {
         let cookie_file = find_dotfile(AUTHFILE_VAR, AUTHFILE_NAME);
-        let dotfile     = find_dotfile(DOTFILE_VAR, DOTFILE_NAME);
+        let dotfile = find_dotfile(DOTFILE_VAR, DOTFILE_NAME);
 
         Config {
             cookie_file,
             dotfile,
-            endpoint:    API_ENDPOINT.to_owned(),
-            on_behalf:   None,
-            overwrite:   OverwritePolicy::Ask,
-            verbosity:   1,
+            endpoint: API_ENDPOINT.to_owned(),
+            on_behalf: None,
+            overwrite: OverwritePolicy::Ask,
+            verbosity: 1,
             json_output: false,
         }
     }
@@ -125,7 +124,7 @@ impl Config {
     pub fn get_cookie_file(&self) -> Result<&Path> {
         match &self.cookie_file {
             Some(filename) => Ok(&filename),
-            _              => Err(ErrorKind::NoCookieFileGiven)?,
+            _ => Err(ErrorKind::NoCookieFileGiven)?,
         }
     }
 
@@ -135,21 +134,21 @@ impl Config {
 
     pub fn read_dotfile(&self) -> Result<Option<Dotfile>> {
         let dotfile_name = match self.get_dotfile() {
-            None           => return Ok(None),
+            None => return Ok(None),
             Some(filename) => filename,
         };
 
-        let contents     = match fs::read_to_string(dotfile_name) {
-            Ok(contents)   => contents,
-            Err(error)     => match error.kind() {
+        let contents = match fs::read_to_string(dotfile_name) {
+            Ok(contents) => contents,
+            Err(error) => match error.kind() {
                 io::ErrorKind::NotFound => return Ok(None),
                 _ => {
                     let message = format!("Could not read dotfile: {}", dotfile_name.display());
                     return Err(Error::with_chain(error, message));
                 }
-            }
+            },
         };
-        
+
         let parsed = serde_yaml::from_str(&contents)
             .chain_err(|| format!("Could not parse dotfile: {}", dotfile_name.display()))?;
 
@@ -157,7 +156,11 @@ impl Config {
     }
 
     pub fn load_dotfile(&mut self) -> Result<()> {
-        if let Some(Dotfile {endpoint, verbosity}) = self.read_dotfile()? {
+        if let Some(Dotfile {
+            endpoint,
+            verbosity,
+        }) = self.read_dotfile()?
+        {
             if !endpoint.is_empty() {
                 self.endpoint = endpoint;
             }
@@ -173,18 +176,19 @@ impl Config {
 
 impl OverwritePolicy {
     pub fn confirm_overwrite<D: fmt::Display, F: FnOnce() -> D>(
-        &mut self, dst_thunk: F) -> Result<bool> {
-
+        &mut self,
+        dst_thunk: F,
+    ) -> Result<bool> {
         use OverwritePolicy::*;
 
         match *self {
             Always => Ok(true),
-            Never  => Err(ErrorKind::DestinationFileExists(dst_thunk().to_string()))?,
-            Ask    => {
-                let     stdin = io::stdin();
+            Never => Err(ErrorKind::DestinationFileExists(dst_thunk().to_string()))?,
+            Ask => {
+                let stdin = io::stdin();
                 let mut input = stdin.lock();
-                let mut buf   = String::with_capacity(2);
-                let     dst   = dst_thunk();
+                let mut buf = String::with_capacity(2);
+                let dst = dst_thunk();
 
                 loop {
                     print!("File ‘{}’ already exists.\nOverwrite [Y/N/A/C]? ", dst);
@@ -201,7 +205,7 @@ impl OverwritePolicy {
                         Some('n') => {
                             v2!("Skipping ‘{}’.", dst);
                             return Ok(false);
-                        },
+                        }
                         Some('a') => {
                             *self = Always;
                             return Ok(true);

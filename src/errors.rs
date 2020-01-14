@@ -1,7 +1,7 @@
 use super::RemotePattern;
 
 use error_chain::*;
-use serde_derive::{Serialize, Deserialize};
+use serde_derive::{Deserialize, Serialize};
 
 use std::path::PathBuf;
 
@@ -9,8 +9,8 @@ use std::path::PathBuf;
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct JsonStatus {
-    pub status:  u16,
-    pub title:   String,
+    pub status: u16,
+    pub title: String,
     pub message: String,
 }
 
@@ -136,9 +136,10 @@ impl ErrorKind {
         Self::SyntaxError(class.into(), thing.into())
     }
 
-    pub fn dest_pat_is_multiple(rpat: &RemotePattern,
-                                rfile_metas: &[super::messages::FileMeta]) -> Self {
-
+    pub fn dest_pat_is_multiple(
+        rpat: &RemotePattern,
+        rfile_metas: &[super::messages::FileMeta],
+    ) -> Self {
         let rfiles = RemoteFiles(rfile_metas.iter().map(|meta| meta.name.clone()).collect());
         ErrorKind::DestinationPatternIsMultiple(rpat.clone(), rfiles)
     }
@@ -149,13 +150,13 @@ impl Error {
         ErrorKind::syntax(class, thing).into()
     }
 
-    pub fn dest_pat_is_multiple(rpat: &RemotePattern,
-                                rfile_metas: &[super::messages::FileMeta]) -> Self {
-
+    pub fn dest_pat_is_multiple(
+        rpat: &RemotePattern,
+        rfile_metas: &[super::messages::FileMeta],
+    ) -> Self {
         ErrorKind::dest_pat_is_multiple(rpat, rfile_metas).into()
     }
 }
-
 
 impl std::fmt::Display for RemoteFiles {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
