@@ -1,5 +1,7 @@
 use fs2::FileExt;
 use reqwest::header::HeaderValue;
+use std::default::Default;
+use std::fmt;
 use std::fs::File;
 use std::io::{BufRead, Seek, Write};
 use std::path::Path;
@@ -7,13 +9,49 @@ use vlog::*;
 
 use super::errors::*;
 
+#[derive(Debug, Default)]
+pub struct CookieContents {
+    key: String,
+    value: String,
+}
+
+impl fmt::Display for CookieContents {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}={}", self.key, self.value)
+    }
+}
+
+impl CookieContents {
+    pub fn new(key: impl Into<String>,
+               value: impl Into<String>) -> Self {
+        CookieContents {
+            key: key.into(),
+            value: value.into(),
+        }
+    }
+
+    pub fn to_header(&self) -> Result<HeaderValue> {
+        Ok(HeaderValue::from_str(&self.to_string())?)
+    }
+
+    pub fn clear(&mut self) {
+        self.key.clear();
+        self.value.clear();
+    }
+}
+
 #[derive(Debug)]
 pub struct CookieFile {
     file: File,
     dirty: bool,
-    key: String,
-    value: String,
     username: String,
+    contents: CookieContents,
+}
+
+impl fmt::Display for CookieFile {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}:{}", self.username, self.contents)
+    }
 }
 
 impl Drop for CookieFile {
@@ -55,8 +93,7 @@ impl CookieFile {
             file,
             dirty: false,
             username: username.to_owned(),
-            key: String::new(),
-            value: String::new(),
+            contents: CookieContents::default(),
         })
     }
 
@@ -81,8 +118,7 @@ impl CookieFile {
             file,
             dirty: false,
             username: username.to_owned(),
-            key: key.to_owned(),
-            value: value.to_owned(),
+            contents: CookieContents::new(key, value),
         })
     }
 
@@ -90,20 +126,17 @@ impl CookieFile {
         &self.username
     }
 
-    pub fn get_cookie_header(&self) -> Result<HeaderValue> {
-        let cookie = format!("{}={}", self.key, self.value);
-        Ok(HeaderValue::from_str(&cookie)?)
+    pub fn to_header(&self) -> Result<HeaderValue> {
+        self.contents.to_header()
     }
 
-    pub fn set_cookie(&mut self, key: String, value: String) {
-        self.key = key;
-        self.value = value;
+    pub fn set_cookie(&mut self, contents: CookieContents) {
+        self.contents = contents;
         self.dirty = true;
     }
 
     pub fn deauth(&mut self) {
-        self.key.clear();
-        self.value.clear();
+        self.contents.clear();
         self.username.clear();
         self.dirty = true;
     }
@@ -113,9 +146,9 @@ impl CookieFile {
             self.file.set_len(0)?;
             self.file.seek(std::io::SeekFrom::Start(0))?;
 
-            if !self.key.is_empty() {
-                let contents = format!("{}:{}={}\n", self.username, self.key, self.value);
-                self.file.write_all(contents.as_bytes())?;
+            if !self.contents.key.is_empty() {
+                let content = self.to_string();
+                writeln!(self.file, "{}", content)?;
             }
         }
 

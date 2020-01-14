@@ -279,20 +279,21 @@ impl GscClient {
         let uri = self.user_uri(username);
 
         let cookie_file = self.config.get_cookie_file()?;
+        let mut cookie_lock = CookieFile::new(cookie_file, username)?;
 
         loop {
-            let api_key = prompt_secret("API key", username)?;
+            let api_key = prompt_secret("Enter API key", username)?;
+            let cookie = CookieContents::new(API_KEY_COOKIE, api_key);
             ve3!("> Sending request to {}", uri);
             let response = self
                 .http
                 .get(&uri)
-                .basic_auth(username, Some(&api_key))
+                .header(reqwest::header::COOKIE, cookie.to_header()?)
                 .send()?;
 
             match self.handle_response(response) {
                 Ok(_) => {
-                    let mut cookie_lock = CookieFile::new(cookie_file, username)?;
-                    cookie_lock.set_cookie(API_KEY_COOKIE.to_owned(), api_key);
+                    cookie_lock.set_cookie(cookie);
                     v2!("Authenticated as {}", username);
                     return Ok(());
                 }
@@ -1051,7 +1052,7 @@ impl GscClient {
         mut request: blocking::RequestBuilder,
         cookie_lock: &CookieFile,
     ) -> Result<blocking::RequestBuilder> {
-        let cookie = cookie_lock.get_cookie_header()?;
+        let cookie = cookie_lock.to_header()?;
         ve3!("> Sending cookie {}", cookie.to_str().unwrap());
         request = request.header(reqwest::header::COOKIE, cookie);
         Ok(request)
