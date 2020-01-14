@@ -19,6 +19,8 @@ mod args;
 mod cmd;
 mod util;
 
+const API_KEY_COOKIE: &str = "gsc_api_key";
+
 pub mod prelude {
     pub use thousands::Separable;
     pub use vlog::*;
@@ -279,17 +281,18 @@ impl GscClient {
         let cookie_file = self.config.get_cookie_file()?;
 
         loop {
-            let password = prompt_password("Password", username)?;
+            let api_key = prompt_secret("API key", username)?;
             ve3!("> Sending request to {}", uri);
             let response = self
                 .http
                 .get(&uri)
-                .basic_auth(username, Some(password))
+                .basic_auth(username, Some(&api_key))
                 .send()?;
 
-            let cookie_lock = CookieFile::new(cookie_file, username)?;
-            match self.handle_response(response, cookie_lock) {
+            match self.handle_response(response) {
                 Ok(_) => {
+                    let mut cookie_lock = CookieFile::new(cookie_file, username)?;
+                    cookie_lock.set_cookie(API_KEY_COOKIE.to_owned(), api_key);
                     v2!("Authenticated as {}", username);
                     return Ok(());
                 }
@@ -630,24 +633,6 @@ impl GscClient {
         Ok(())
     }
 
-    pub fn create(&mut self, username: &str) -> Result<()> {
-        let password = get_matching_passwords(username)?;
-        let uri = format!("{}/api/users", self.config.get_endpoint());
-
-        ve3!("> Sending request to {}", uri);
-        let response = self
-            .http
-            .post(&uri)
-            .basic_auth(username, Some(password))
-            .send()?;
-        let cookie_lock = CookieFile::new(self.config.get_cookie_file()?, username)?;
-        self.handle_response(response, cookie_lock)?;
-
-        v2!("Created account: {}.", username);
-
-        Ok(())
-    }
-
     pub fn get_eval(&self, hw: usize, number: usize) -> Result<()> {
         let (me, cookie) = self.load_credentials()?;
         let uri = self.get_uri_for_submission(&me, hw, cookie)?;
@@ -758,17 +743,6 @@ impl GscClient {
             status: op,
         }];
 
-        let request = self.http.patch(&uri).json(&message);
-        let response = self.send_request_with_cookie(request, cookie)?;
-        self.print_results(response)
-    }
-
-    pub fn passwd(&self) -> Result<()> {
-        let (me, cookie) = self.load_credentials()?;
-        let password = get_matching_passwords(&me)?;
-        let mut message = messages::UserChange::default();
-        message.password = Some(password);
-        let uri = self.user_uri(&me);
         let request = self.http.patch(&uri).json(&message);
         let response = self.send_request_with_cookie(request, cookie)?;
         self.print_results(response)
@@ -1046,9 +1020,7 @@ impl GscClient {
     fn handle_response(
         &self,
         response: blocking::Response,
-        cookie_lock: CookieFile,
     ) -> Result<blocking::Response> {
-        self.save_cookie(&response, cookie_lock)?;
 
         if response.status().is_success() {
             Ok(response)
@@ -1127,19 +1099,6 @@ impl GscClient {
         format!("{}/api/users/{}", self.config.get_endpoint(), user)
     }
 
-    fn save_cookie(&self, response: &blocking::Response, mut cookie_lock: CookieFile) -> Result<()> {
-        if let Some(cookie) = response.headers().get(reqwest::header::SET_COOKIE) {
-            if let Ok(cookie_text) = cookie.to_str() {
-                if let Some((key, value)) = parse_cookie(cookie_text) {
-                    ve3!("< Received cookie {}={}", key, value);
-                    cookie_lock.set_cookie(key, value);
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     fn send_request(&self, req_builder: blocking::RequestBuilder) -> Result<blocking::Response> {
         let cookie = self.load_cookie_file()?;
         self.send_request_with_cookie(req_builder, cookie)
@@ -1154,7 +1113,7 @@ impl GscClient {
         let request = req_builder.build()?;
         ve3!("> Sending request to {}", request.url());
         let response = self.http.execute(request)?;
-        self.handle_response(response, cookie)
+        self.handle_response(response)
     }
 
     fn try_warn<F, R>(&self, f: F) -> R
@@ -1178,17 +1137,6 @@ define_encode_set! {
     pub ENCODE_SET = [percent_encoding::PATH_SEGMENT_ENCODE_SET] | { '+' }
 }
 
-fn get_matching_passwords(username: &str) -> Result<String> {
-    let password1 = prompt_password("New password", username)?;
-    let password2 = prompt_password("Confirm password", username)?;
-
-    if password1 == password2 {
-        Ok(password1)
-    } else {
-        Err(errors::ErrorKind::PasswordMismatch)?
-    }
-}
-
 fn glob(pattern: &str) -> Result<globset::GlobMatcher> {
     let real_pattern = if pattern.is_empty() { "*" } else { pattern };
     Ok(globset::Glob::new(real_pattern)?.compile_matcher())
@@ -1207,10 +1155,10 @@ pub fn parse_cookie(cookie: &str) -> Option<(String, String)> {
     })
 }
 
-fn prompt_password(prompt: &str, username: &str) -> Result<String> {
+fn prompt_secret(prompt: &str, username: &str) -> Result<String> {
     let prompt = format!("{} for {}: ", prompt, username);
-    let password = rpassword::prompt_password_stderr(&prompt)?;
-    Ok(password)
+    let secret = rpassword::prompt_password_stderr(&prompt)?;
+    Ok(secret)
 }
 
 fn soft_create_dir(path: &Path) -> Result<()> {

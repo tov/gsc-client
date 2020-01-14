@@ -2,7 +2,7 @@
 .de sh
 .  RS 4
 .  PP
-\\fIsh$\\fR \\$*
+\\fIsh%\\fR \\$*
 .  RE
 ..
 .\"
@@ -53,8 +53,8 @@
 .SH "DESCRIPTION"
 .B gsc
 is a command-line client for interacting with the GSC homework server.
-It supports making an account, submitting and retrieving homework code,
-managing partnerships, and changing your password.
+It submitting and retrieving homework code, viewing grades, and
+managing partnerships.
 .\"
 .SH "OPTIONS"
 .option \-q ", " \-\-quiet
@@ -105,11 +105,9 @@ directory \fIsrc/\fR, you would run
 .gsc auth \fR<\fIUSERNAME\fR>
 Authenticates with the homework server.
 .sss details
-Before you can authenticate, an account named \fR<\fIUSERNAME\fR> must
-already exist. You can use \fBgsc create\fR to register an account.
-.PP
-After some period of time (14 days by default), your
-authentication will expire and you will need to run this command again.
+In order to authenticate, you will need to enter your API key, which
+you can get by visiting GSC in your web browser at
+.IR https://cs211.cs.northwestern.edu/gsc/ .
 .sse
 .gsc cat \fR[\fB\-a\fR|\fB\-\-all\fR] \fBhw\fR<\fIN\fR>\fB:\fR[\fR<\fISPEC\fR>] \fI...
 Prints the contents of the specified remote files or homeworks to the
@@ -225,20 +223,6 @@ Download all files from remote HW1, recreating the project
 structure in a local subdirectory named \[lq]\fIfoobar\fR\[rq]:
 .sh gsc cp \-a hw1: foobar
 .sse
-.gsc create \fR<\fIUSERNAME\fR>
-Creates a new account on the homework server.
-.sss details
-The name of the new account will be \fR<\fIUSERNAME\fR>. This \fBMUST\fR
-be your Northwestern NetID (three or four letters followed by three
-digits), or you will not get credit for your submissions.
-.PP
-The command will prompt you to enter and then confirm a password, after
-which it will attempt to create an account with the homework server.
-Note that the server may reject a password as too weak. Passwords are
-evaluated based on the length and the number of different character
-classes (uppercase letter, lowercase letters, digits, and punctuation)
-involved.
-.sse
 .gsc deauth
 Logs you out from the homework server.
 .gsc eval get \fBhw\fR<\fIN\fR> \fR<\fINUMBER\fR>
@@ -297,19 +281,6 @@ To view outstanding partner requests, use the
 .B "gsc status"
 subcommand.
 .sse
-.gsc passwd
-Changes your password.
-.sss details
-You must already be authenticated to change your password. If you don't
-know your password, contact course staff to have it reset.
-.PP
-The command will prompt you to enter and then confirm a password, after
-which it will attempt to change your password on the homework server.
-Note that the server may reject a password as too weak. Passwords are
-evaluated based on the length and the number of different character
-classes (uppercase letter, lowercase letters, digits, and punctuation)
-involved.
-.sse
 .gsc rm \fR[\fB\-a\fR|\fB\-\-all\fR] \fBhw\fR<\fIN\fR>\fB:\fR[\fR<\fISPEC\fR>] \fI...
 Deletes files on the homework server.
 .sss options
@@ -337,7 +308,7 @@ On startup,
 .B gsc
 looks for its configuration file in two places. If the environment
 variable
-.I $GSC_DOTFILE
+.I $GSC_RC_FILE
 is set then it uses that; otherwise, it tries
 .IR $HOME/.gscrc .
 Supported configuration options include:
@@ -359,9 +330,9 @@ server.
 Additionally, by default
 .B gsc
 stores its authentication cookie in
-.IR $HOME/.gsclogin ,
+.IR $HOME/.gscauth ,
 but if the environment variable
-.I $GSC_LOGIN
+.I $GSC_AUTH_FILE
 is set then it uses that file instead.
 .\"
 .SH "AUTHOR"

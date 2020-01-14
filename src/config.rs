@@ -11,10 +11,10 @@ use serde_yaml;
 
 const API_ENDPOINT: &str = "https://stewie.cs.northwestern.edu";
 
-const AUTHFILE_VAR: &str = "GSC_AUTH";
+const AUTHFILE_VAR: &str = "GSC_AUTH_FILE";
 const AUTHFILE_NAME: &str = ".gscauth";
 
-const DOTFILE_VAR: &str = "GSC_RC";
+const DOTFILE_VAR: &str = "GSC_RC_FILE";
 const DOTFILE_NAME: &str = ".gscrc";
 
 #[derive(Debug)]

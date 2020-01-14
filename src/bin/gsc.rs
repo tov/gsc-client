@@ -75,9 +75,6 @@ enum Command {
     Cat {
         rpats: Vec<RemotePattern>,
     },
-    Create {
-        user: String,
-    },
     Cp {
         srcs: Vec<CpArg>,
         dst: CpArg,
@@ -113,7 +110,6 @@ enum Command {
         hw: usize,
         them: String,
     },
-    Passwd,
     Rm {
         rpats: Vec<RemotePattern>,
     },
@@ -163,7 +159,6 @@ fn do_it() -> Result<bool> {
         AdminSubmissions { hw } => client.admin_submissions(hw),
         Auth { user } => client.auth(&user),
         Cat { rpats } => client.cat(&rpats),
-        Create { user } => client.create(&user),
         Cp { srcs, dst } => client.cp(&srcs, &dst),
         Deauth => client.deauth(),
         EvalGet { hw, number } => client.get_eval(hw, number),
@@ -179,7 +174,6 @@ fn do_it() -> Result<bool> {
         PartnerRequest { hw, them } => client.partner_request(hw, &them),
         PartnerAccept { hw, them } => client.partner_accept(hw, &them),
         PartnerCancel { hw, them } => client.partner_cancel(hw, &them),
-        Passwd => client.passwd(),
         Rm { rpats } => client.rm(&rpats),
         Status { hw: Some(i) } => client.status_hw(i),
         Status { hw: None } => client.status_user(),
@@ -251,12 +245,6 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                         .req_arg("DST", "The destination of the files"),
                 )
                 .subcommand(
-                    SubCommand::with_name("create")
-                        .about("Creates a new account")
-                        .add_common()
-                        .req_arg("USER", "The new account’s username (i.e., your NetID)"),
-                )
-                .subcommand(
                     SubCommand::with_name("deauth")
                         .about("Forgets authentication credentials")
                         .add_common(),
@@ -313,11 +301,6 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                                 .about("Cancels a partner request")
                                 .add_partner_args(),
                         ),
-                )
-                .subcommand(
-                    SubCommand::with_name("passwd")
-                        .about("Changes the password")
-                        .add_common(),
                 )
                 .subcommand(
                     SubCommand::with_name("rm")
@@ -457,10 +440,6 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             }
 
             Ok(Command::Cat { rpats })
-        } else if let Some(submatches) = matches.subcommand_matches("create") {
-            process_common(submatches, config);
-            let user = submatches.value_of("USER").unwrap().to_owned();
-            Ok(Command::Create { user })
         } else if let Some(submatches) = matches.subcommand_matches("cp") {
             process_common(submatches, config);
             let all = submatches.is_present("ALL");
@@ -554,9 +533,6 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             } else {
                 Ok(Command::Partner)
             }
-        } else if let Some(submatches) = matches.subcommand_matches("passwd") {
-            process_common(submatches, config);
-            Ok(Command::Passwd)
         } else if let Some(submatches) = matches.subcommand_matches("rm") {
             process_common(submatches, config);
             let all = submatches.is_present("ALL");
