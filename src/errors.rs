@@ -33,8 +33,7 @@ error_chain! {
         ServerError(contents: JsonStatus) {
             description("error from server")
             display("Error response from server:\n  {} {}\n  {}",
-                    contents.status, contents.title,
-            contents.message)
+                    contents.status, contents.title, contents.message)
         }
 
         UnknownHomework(number: usize) {
@@ -45,11 +44,6 @@ error_chain! {
         SyntaxError(class: String, thing: String) {
             description("syntax error")
             display("Syntax error: could not parse ‘{}’ as {}.", thing, class)
-        }
-
-        PasswordMismatch {
-            description("password mismatch")
-            display("Passwords do not match.")
         }
 
         NoCommandGiven {
@@ -73,6 +67,12 @@ error_chain! {
         }
 
         CannotCopyLocalToLocal(src: PathBuf, dst: PathBuf) {
+            description("cannot copy local to local")
+            display("Cannot copy local file ({}) to local destination ({}).",
+                    src.display(), dst.display())
+        }
+
+        CannotCopyLocalToLocalDidYouMean(src: PathBuf, dst: PathBuf) {
             description("cannot copy local to local")
             display("Cannot copy local file ({}) to local destination ({}).",
                     src.display(), dst.display())
