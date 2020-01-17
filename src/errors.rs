@@ -1,6 +1,8 @@
 use super::RemotePattern;
 
 use error_chain::*;
+use lazy_static::lazy_static;
+use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 
 use std::path::PathBuf;
@@ -72,10 +74,10 @@ error_chain! {
                     src.display(), dst.display())
         }
 
-        CannotCopyLocalToLocalDidYouMean(src: PathBuf, dst: PathBuf) {
+        CannotCopyLocalToLocalExtra(src: PathBuf, dst: PathBuf, extra: String) {
             description("cannot copy local to local")
-            display("Cannot copy local file ({}) to local destination ({}).",
-                    src.display(), dst.display())
+            display("Cannot copy local file ({}) to local destination ({}).\n{}",
+                    src.display(), dst.display(), extra)
         }
 
         CannotCopyRemoteToRemote(src: RemotePattern, dst: RemotePattern) {
@@ -130,7 +132,6 @@ error_chain! {
         }
     }
 }
-
 impl ErrorKind {
     pub fn syntax(class: impl Into<String>, thing: impl Into<String>) -> Self {
         Self::SyntaxError(class.into(), thing.into())
@@ -141,7 +142,27 @@ impl ErrorKind {
         rfile_metas: &[super::messages::FileMeta],
     ) -> Self {
         let rfiles = RemoteFiles(rfile_metas.iter().map(|meta| meta.name.clone()).collect());
-        ErrorKind::DestinationPatternIsMultiple(rpat.clone(), rfiles)
+        Self::DestinationPatternIsMultiple(rpat.clone(), rfiles)
+    }
+
+    pub fn cannot_copy_local_to_local(src: impl Into<PathBuf>,
+                                      dst: impl Into<PathBuf>) -> Self {
+
+        lazy_static! {
+            pub static ref HW_NUM: Regex = Regex::new(r"^hw\d+$").unwrap();
+        }
+
+        let src = src.into();
+        let dst = dst.into();
+
+        let dst_str = dst.display().to_string();
+
+        if HW_NUM.is_match(&dst_str) {
+            let message = format!("Did you leave out the colon ({}:)?", dst_str);
+            Self::CannotCopyLocalToLocalExtra(src, dst, message)
+        } else {
+            Self::CannotCopyLocalToLocal(src, dst)
+        }
     }
 }
 

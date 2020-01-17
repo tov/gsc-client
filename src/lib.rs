@@ -317,10 +317,8 @@ impl GscClient {
 
         for src in raw_srcs {
             match src {
-                CpArg::Local(filename) => Err(ErrorKind::CannotCopyLocalToLocal(
-                    filename.clone(),
-                    dst.to_owned(),
-                ))?,
+                CpArg::Local(filename) => Err(
+                    ErrorKind::cannot_copy_local_to_local(filename, dst))?,
                 CpArg::Remote(rpat) => src_rpats.push(rpat),
             }
         }
