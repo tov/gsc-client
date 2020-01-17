@@ -41,6 +41,7 @@ pub use prelude::*;
 
 use self::cookie::*;
 use self::util::{hanging, Percentage};
+use std::cmp::Ordering;
 
 pub struct GscClient {
     http: blocking::Client,
@@ -284,6 +285,8 @@ impl GscClient {
 
         loop {
             let api_key = prompt_secret("Enter API key", username)?;
+            let api_key = check_api_key(&api_key)?;
+
             let cookie = CookieContents::new(API_KEY_COOKIE, api_key);
             ve3!("> Sending request to {}", uri);
             let response = self
@@ -1159,6 +1162,57 @@ fn prompt_secret(prompt: &str, username: &str) -> Result<String> {
     let prompt = format!("{} for {}: ", prompt, username);
     let secret = rpassword::prompt_password_stderr(&prompt)?;
     Ok(secret)
+}
+
+fn check_api_key(api_key: &str) -> Result<String> {
+    const KEY_LEN: usize = 40;
+
+    let mut reasons = Vec::new();
+
+    fn bail(reasons: Vec<String>) -> Result<()> {
+        if reasons.is_empty() {
+            Ok(())
+        } else {
+            Err(ErrorKind::NotAnApiKey(reasons.into()).into())
+        }
+    }
+
+    if api_key.len() == 0 {
+        bail(vec!["It’s empty!".to_owned()])?;
+    }
+
+    let api_key = api_key.trim_matches(|c: char| c.is_ascii_whitespace());
+
+    let len = api_key.len();
+
+    if len == 0 {
+        bail(vec!["It’s nothing but whitespace.".to_owned()])?;
+    }
+
+    match len.cmp(&KEY_LEN) {
+        Ordering::Equal => {}
+        Ordering::Less =>
+            reasons.push(format!("It’s only {} characters, but I expected {}",
+                                 len, KEY_LEN)),
+        Ordering::Greater =>
+            reasons.push(format!("It’s {} characters, but I expected only {}",
+                                 len, KEY_LEN)),
+    }
+
+    let mut result = String::new();
+
+    for c in api_key.chars() {
+        if !c.is_ascii_hexdigit() {
+            reasons.push(format!("It contains non-hexdigit characters like {:?}", c));
+            break;
+        }
+
+        result.push(c.to_ascii_lowercase());
+    }
+
+    bail(reasons)?;
+
+    Ok(result)
 }
 
 fn soft_create_dir(path: &Path) -> Result<()> {

@@ -5,6 +5,7 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 
+use std::fmt;
 use std::path::PathBuf;
 
 /// This is the format of error messages produced by the server.
@@ -18,6 +19,25 @@ pub struct JsonStatus {
 
 #[derive(Debug)]
 pub struct RemoteFiles(pub Vec<String>);
+
+#[derive(Debug)]
+pub struct BadApiKeyReasons(pub Vec<String>);
+
+impl From<Vec<String>> for BadApiKeyReasons {
+    fn from(v: Vec<String>) -> Self {
+        BadApiKeyReasons(v)
+    }
+}
+
+impl fmt::Display for BadApiKeyReasons {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for reason in &self.0 {
+            writeln!(f, " - {}", reason)?;
+        }
+
+        Ok(())
+    }
+}
 
 error_chain! {
     foreign_links {
@@ -36,6 +56,11 @@ error_chain! {
             description("error from server")
             display("Error response from server:\n  {} {}\n  {}",
                     contents.status, contents.title, contents.message)
+        }
+
+        NotAnApiKey(reasons: BadApiKeyReasons) {
+            description("doesn't look like an API key")
+            display("That doesn’t look like an API key:\n{}", reasons)
         }
 
         UnknownHomework(number: usize) {
