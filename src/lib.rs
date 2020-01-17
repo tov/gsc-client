@@ -276,6 +276,7 @@ impl GscClient {
     }
 
     pub fn auth(&mut self, username: &str) -> Result<()> {
+        let username = &username.to_lowercase();
         let uri = self.user_uri(username);
 
         let cookie_file = self.config.get_cookie_file()?;
