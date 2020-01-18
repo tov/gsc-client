@@ -1,6 +1,6 @@
 #![recursion_limit = "128"]
 
-use percent_encoding::{define_encode_set, utf8_percent_encode};
+use percent_encoding as enc;
 
 use reqwest::blocking as blocking;
 
@@ -501,7 +501,7 @@ impl GscClient {
 
     fn upload_file(&self, src: &Path, dst: &RemotePattern) -> Result<()> {
         let src_file = std::fs::File::open(&src)?;
-        let encoded_dst = utf8_percent_encode(&dst.name, ENCODE_SET);
+        let encoded_dst = enc::utf8_percent_encode(&dst.name, ENCODE_SET);
         let base_uri = self.get_uri_for_submission_files(dst.hw)?;
         let uri = format! {"{}/{}", base_uri, encoded_dst};
         let request = self.http.put(&uri).body(src_file);
@@ -1134,9 +1134,20 @@ impl GscClient {
     }
 }
 
-define_encode_set! {
-    pub ENCODE_SET = [percent_encoding::PATH_SEGMENT_ENCODE_SET] | { '+' }
-}
+const ENCODE_SET: &'static enc::AsciiSet =
+    &enc::CONTROLS
+        .add(b' ')
+        .add(b'"')
+        .add(b'#')
+        .add(b'<')
+        .add(b'>')
+        .add(b'`')
+        .add(b'?')
+        .add(b'{')
+        .add(b'}')
+        .add(b'%')
+        .add(b'/')
+        .add(b'+');
 
 fn glob(pattern: &str) -> Result<globset::GlobMatcher> {
     let real_pattern = if pattern.is_empty() { "*" } else { pattern };
