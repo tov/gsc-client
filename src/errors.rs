@@ -5,6 +5,7 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
 
+use std::borrow::Borrow;
 use std::fmt;
 use std::path::PathBuf;
 
@@ -21,21 +22,80 @@ pub struct JsonStatus {
 pub struct RemoteFiles(pub Vec<String>);
 
 #[derive(Debug)]
-pub struct BadApiKeyReasons(pub Vec<String>);
+pub struct ApiKeyExplanation<S> {
+    reasons: Vec<String>,
+    bad_key: Option<S>,
+}
 
-impl From<Vec<String>> for BadApiKeyReasons {
-    fn from(v: Vec<String>) -> Self {
-        BadApiKeyReasons(v)
+impl<'a> ApiKeyExplanation<&'a str> {
+    pub fn new() -> Self {
+        Self {
+            reasons: Vec::new(),
+            bad_key: None,
+        }
+    }
+
+    pub fn with_key(bad_key: &'a str) -> Self {
+        Self {
+            reasons: Vec::new(),
+            bad_key: Some(bad_key),
+        }
+    }
+
+    fn into_err<T>(self) -> self::Result<T> {
+        Err(Error::from(ErrorKind::NotAnApiKey(ApiKeyExplanation {
+            reasons: self.reasons,
+            bad_key: self.bad_key.map(str::to_owned),
+        })))
+    }
+
+    pub fn add(&mut self, reason: impl Into<String>) {
+        self.reasons.push(reason.into());
+    }
+
+    pub fn final_straw<T>(mut self, reason: impl Into<String>) -> self::Result<T> {
+        self.add(reason);
+        self.into_err()
+    }
+
+    pub fn into_result(self) -> self::Result<()> {
+        if self.reasons.is_empty() {
+            Ok(())
+        } else {
+            self.into_err()
+        }
     }
 }
 
-impl fmt::Display for BadApiKeyReasons {
+impl<S: Borrow<str>> fmt::Display for ApiKeyExplanation<S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for reason in &self.0 {
+        const SHOW_LEN: usize = 30;
+
+        if let Some(bad_key) = &self.bad_key {
+            let bad_key = bad_key.borrow();
+            write!(f, "\nThis doesn’t look like an API key: ")?;
+            if let Some(abbrev) = bad_key.get(..SHOW_LEN) {
+                write!(f, "\"")?;
+                for c in abbrev.chars() {
+                    write!(f, "{}", c.escape_default())?;
+                }
+                writeln!(f, "[…]\".")?;
+            } else {
+                writeln!(f, "{:?}.", bad_key)?;
+            }
+        } else {
+            writeln!(f, "That doesn’t look like an API key.")?;
+        }
+
+        for reason in &self.reasons {
             writeln!(f, " - {}", reason)?;
         }
 
-        Ok(())
+        if self.bad_key.is_none() {
+            writeln!(f, "\nTo see the key you entered, re-run gsc with the -v flag.")?;
+        }
+
+        writeln!(f)
     }
 }
 
@@ -58,9 +118,9 @@ error_chain! {
                     contents.status, contents.title, contents.message)
         }
 
-        NotAnApiKey(reasons: BadApiKeyReasons) {
+        NotAnApiKey(explanation: ApiKeyExplanation<String>) {
             description("doesn't look like an API key")
-            display("That doesn’t look like an API key:\n{}", reasons)
+            display("{}", explanation)
         }
 
         UnknownHomework(number: usize) {
@@ -157,6 +217,7 @@ error_chain! {
         }
     }
 }
+
 impl ErrorKind {
     pub fn syntax(class: impl Into<String>, thing: impl Into<String>) -> Self {
         Self::SyntaxError(class.into(), thing.into())

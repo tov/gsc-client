@@ -42,6 +42,7 @@ pub use prelude::*;
 use self::cookie::*;
 use self::util::{hanging, Percentage};
 use std::cmp::Ordering;
+use crate::errors::ApiKeyExplanation;
 
 pub struct GscClient {
     http: blocking::Client,
@@ -285,7 +286,7 @@ impl GscClient {
 
         loop {
             let api_key = prompt_secret("Enter API key", username)?;
-            let api_key = check_api_key(&api_key)?;
+            let api_key = check_api_key(&api_key, self.config())?;
 
             let cookie = CookieContents::new(API_KEY_COOKIE, api_key);
             ve3!("> Sending request to {}", uri);
@@ -1175,21 +1176,17 @@ fn prompt_secret(prompt: &str, username: &str) -> Result<String> {
     Ok(secret)
 }
 
-fn check_api_key(api_key: &str) -> Result<String> {
+fn check_api_key(api_key: &str, config: &config::Config) -> Result<String> {
     const KEY_LEN: usize = 40;
 
-    let mut reasons = Vec::new();
-
-    fn bail(reasons: Vec<String>) -> Result<()> {
-        if reasons.is_empty() {
-            Ok(())
-        } else {
-            Err(ErrorKind::NotAnApiKey(reasons.into()).into())
-        }
-    }
+    let mut reasons = if config.get_verbosity() > 1 {
+        ApiKeyExplanation::with_key(api_key)
+    } else {
+        ApiKeyExplanation::new()
+    };
 
     if api_key.len() == 0 {
-        bail(vec!["It’s empty!".to_owned()])?;
+        return reasons.final_straw("It’s empty!");
     }
 
     let api_key = api_key.trim_matches(|c: char| c.is_ascii_whitespace());
@@ -1197,31 +1194,31 @@ fn check_api_key(api_key: &str) -> Result<String> {
     let len = api_key.len();
 
     if len == 0 {
-        bail(vec!["It’s nothing but whitespace.".to_owned()])?;
+        return reasons.final_straw("It’s nothing but whitespace.");
     }
 
     match len.cmp(&KEY_LEN) {
-        Ordering::Equal => {}
+        Ordering::Equal => {},
         Ordering::Less =>
-            reasons.push(format!("It’s only {} characters, but I expected {}",
-                                 len, KEY_LEN)),
+            reasons.add(format!("It’s only {} characters, but I expected {}.",
+                                len, KEY_LEN)),
         Ordering::Greater =>
-            reasons.push(format!("It’s {} characters, but I expected only {}",
-                                 len, KEY_LEN)),
+            reasons.add(format!("It’s {} characters, but I expected only {}.",
+                                len, KEY_LEN)),
     }
 
     let mut result = String::new();
 
     for c in api_key.chars() {
         if !c.is_ascii_hexdigit() {
-            reasons.push(format!("It contains non-hexdigit characters like {:?}", c));
+            reasons.add(format!("It contains non-hexdigit characters like {:?}.", c));
             break;
         }
 
         result.push(c.to_ascii_lowercase());
     }
 
-    bail(reasons)?;
+    reasons.into_result()?;
 
     Ok(result)
 }
