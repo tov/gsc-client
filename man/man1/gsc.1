@@ -154,8 +154,10 @@ used to download files from an earlier submission back to your shell
 account.
 .B gsc
 cannot copy local to local or remote to remote. For the former, use
-.BR cp (1);
-for the latter, you will have to download and reupload.
+the standard
+.BR cp (1)
+command; to \fImove\fR files between remote homeworks, see
+.BR "gsc mv" .
 .PP
 The five forms are:
 .IP 1. 4
@@ -256,6 +258,27 @@ type (\fIs\fRource, \fIt\fRest, \fIc\fRonfig, \fIr\fResource, or
 \fIl\fRog)
 .IP 4.
 name
+.sse
+.gsc mv \fR[\fI\fB\-f\fR|\fB\-i\fR|\fB\-n\fR]\fB \ \fBhw\fR<\fIN\fR>\fB:\fR<\fIFILE\fR> \ \fR<\fIFILE\fR> \ \ \ \ \ \ \ \ \ \ \ \ \ \fB# \fR[1]
+.gsc mv \fR[\fI\fB\-f\fR|\fB\-i\fR|\fB\-n\fR]\fB \ \fBhw\fR<\fIN\fR>\fB:\fR<\fIFILE\fR> \ \fBhw\fR<\fIN\fR>\fB:\fR[<\fIFILE\fR>] \ \ \ \ \ \fB# \fR[2]
+Renames a remote file or moves it to a different homework assignment.
+.sss options
+.option \-f
+Forces overwriting existing local files without asking.
+.option \-i
+Interactively asks before overwriting existing local files.
+.option \-n
+Never overwrites existing local files.
+.sse
+.sss details
+In form #1,
+.B "gsc mv"
+renames the given file without changing which homework it belongs to.
+In form #2,
+.B "gsc mv"
+moves a file to a different homework assignment. If the optional
+destination filename is specified then the file will be renamed as
+well.
 .sse
 .gsc partner \fR<\fIACTION\fR> \fBhw\fR<\fIN\fR> \fR<\fIUSERNAME\fR>
 Creates, accepts, and cancels partner requests.
