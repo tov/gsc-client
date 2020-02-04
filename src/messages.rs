@@ -162,6 +162,7 @@ pub enum SubmissionStatus {
 pub enum SubmissionEvalStatus {
     Empty,
     Started,
+    Overdue,
     Complete,
 }
 
@@ -287,6 +288,7 @@ impl SubmissionEvalStatus {
         match *self {
             Empty => "empty",
             Started => "started",
+            Overdue => "overdue",
             Complete => "complete",
         }
     }
