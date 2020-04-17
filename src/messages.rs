@@ -236,6 +236,7 @@ pub struct UserChange {
     pub role: Option<UserRole>,
 }
 
+// TODO: Use UTC instead of server-local-time-in-strings.
 #[derive(Serialize, Debug, Default)]
 pub struct SubmissionChange {
     #[serde(skip_serializing_if = "Option::is_none")]
