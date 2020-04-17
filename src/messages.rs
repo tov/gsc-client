@@ -52,6 +52,7 @@ pub enum FilePurpose {
     Config,
     Resource,
     Log,
+    Forbidden,
 }
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -316,6 +317,7 @@ impl FilePurpose {
             Config => 'c',
             Resource => 'r',
             Log => 'l',
+            Forbidden => 'F',
         }
     }
 
@@ -328,6 +330,7 @@ impl FilePurpose {
             Config => ".",
             Resource => "Resources",
             Log => ".",
+            Forbidden => ".",
         }
     }
 }
