@@ -13,4 +13,10 @@ export OPENSSL_INCLUDE_DIR
 OPENSSL_LIB_DIR=$TOV_PUB/lib64
 export OPENSSL_LIB_DIR
 
-cargo install --verbose --force --path .
+if [ "$1" = -l ]; then
+    cargo install --verbose --force \
+        --path .
+else
+    cargo install --verbose --force \
+        --git https://github.com/tov/gsc-client.git
+fi
