@@ -1,7 +1,8 @@
 use serde_derive::{Deserialize, Serialize};
+use chrono::{DateTime, offset};
 
 #[derive(Clone, Deserialize, Debug)]
-pub struct DateTime(chrono::DateTime<chrono::offset::Utc>);
+pub struct UtcDateTime(DateTime<offset::Utc>);
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
@@ -80,7 +81,7 @@ pub struct FileMeta {
     pub media_type: String,
     pub name: String,
     pub purpose: FilePurpose,
-    pub upload_time: DateTime,
+    pub upload_time: UtcDateTime,
     pub uri: String,
 }
 
@@ -192,10 +193,10 @@ pub struct Submission {
     pub owner2: Option<UserShort>,
     pub bytes_used: usize,
     pub bytes_quota: usize,
-    pub open_date: DateTime,
-    pub due_date: DateTime,
-    pub eval_date: DateTime,
-    pub last_modified: DateTime,
+    pub open_date: UtcDateTime,
+    pub due_date: UtcDateTime,
+    pub eval_date: UtcDateTime,
+    pub last_modified: UtcDateTime,
     pub eval_status: SubmissionEvalStatus,
     pub status: SubmissionStatus,
 }
@@ -249,13 +250,13 @@ pub struct SubmissionChange {
     pub owner2: Option<()>,
 }
 
-impl DateTime {
-    fn into_local(self) -> chrono::DateTime<chrono::offset::Local> {
+impl UtcDateTime {
+    fn into_local(self) -> DateTime<offset::Local> {
         self.0.into()
     }
 }
 
-impl std::fmt::Display for DateTime {
+impl std::fmt::Display for UtcDateTime {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let local = self.clone().into_local();
         write!(f, "{}", local.format("%a %d %b, %H:%M %Z"))
