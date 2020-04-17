@@ -248,9 +248,16 @@ pub struct SubmissionChange {
     pub owner2: Option<()>,
 }
 
+impl DateTime {
+    fn into_local(self) -> chrono::DateTime<chrono::offset::Local> {
+        self.0.into()
+    }
+}
+
 impl std::fmt::Display for DateTime {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.0.format("%b %d %H:%M"))
+        let local = self.clone().into_local();
+        write!(f, "{}", local.format("%a %d %b, %H:%M %Z"))
     }
 }
 
