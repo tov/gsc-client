@@ -259,7 +259,7 @@ impl UtcDateTime {
 impl std::fmt::Display for UtcDateTime {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let local = self.clone().into_local();
-        write!(f, "{}", local.format("%a %d %b, %H:%M %Z"))
+        write!(f, "{}", local.format("%a %d %b, %H:%M (%z)"))
     }
 }
 
