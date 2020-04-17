@@ -1,6 +1,6 @@
 [package]
 name = "gsc-client"
-version = "0.3.0"
+version = "0.3.1-alpha.0"
 authors = ["Jesse A. Tov <jesse@cs.northwestern.edu>"]
 edition = "2018"
 
