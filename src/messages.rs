@@ -1,7 +1,7 @@
 use serde_derive::{Deserialize, Serialize};
 
 #[derive(Clone, Deserialize, Debug)]
-pub struct DateTime(chrono::DateTime<chrono::offset::FixedOffset>);
+pub struct DateTime(chrono::DateTime<chrono::offset::Utc>);
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
