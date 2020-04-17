@@ -1,7 +1,7 @@
 use serde_derive::{Deserialize, Serialize};
 
 #[derive(Clone, Deserialize, Debug)]
-pub struct DateTime(chrono::DateTime<chrono::offset::FixedOffset>);
+pub struct DateTime(chrono::DateTime<chrono::offset::Utc>);
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
@@ -236,6 +236,7 @@ pub struct UserChange {
     pub role: Option<UserRole>,
 }
 
+// TODO: Use UTC instead of server-local-time-in-strings.
 #[derive(Serialize, Debug, Default)]
 pub struct SubmissionChange {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -248,9 +249,16 @@ pub struct SubmissionChange {
     pub owner2: Option<()>,
 }
 
+impl DateTime {
+    fn into_local(self) -> chrono::DateTime<chrono::offset::Local> {
+        self.0.into()
+    }
+}
+
 impl std::fmt::Display for DateTime {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.0.format("%b %d %H:%M"))
+        let local = self.clone().into_local();
+        write!(f, "{}", local.format("%a %d %b, %H:%M %Z"))
     }
 }
 
