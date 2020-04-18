@@ -1,7 +1,7 @@
+use chrono::{offset, DateTime};
 use serde_derive::{Deserialize, Serialize};
-use chrono::{DateTime, offset};
 
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct UtcDateTime(DateTime<offset::Utc>);
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -237,13 +237,12 @@ pub struct UserChange {
     pub role: Option<UserRole>,
 }
 
-// TODO: Use UTC instead of server-local-time-in-strings.
 #[derive(Serialize, Debug, Default)]
 pub struct SubmissionChange {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub due_date: Option<String>,
+    pub due_date: Option<UtcDateTime>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub eval_date: Option<String>,
+    pub eval_date: Option<UtcDateTime>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bytes_quota: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -254,12 +253,24 @@ impl UtcDateTime {
     fn into_local(self) -> DateTime<offset::Local> {
         self.0.into()
     }
+
+    fn from_local(local: DateTime<offset::Local>) -> Self {
+        Self(local.into())
+    }
 }
 
 impl std::fmt::Display for UtcDateTime {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let local = self.clone().into_local();
         write!(f, "{}", local.format("%a %d %b, %H:%M (%z)"))
+    }
+}
+
+impl std::str::FromStr for UtcDateTime {
+    type Err = chrono::format::ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(Self::from_local)
     }
 }
 

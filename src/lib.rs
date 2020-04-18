@@ -2,7 +2,7 @@
 
 use percent_encoding as enc;
 
-use reqwest::blocking as blocking;
+use reqwest::blocking;
 
 use std::cell::{Cell, RefCell};
 use std::collections::{hash_map, HashMap};
@@ -41,8 +41,8 @@ pub use prelude::*;
 
 use self::cookie::*;
 use self::util::{hanging, Percentage};
-use std::cmp::Ordering;
 use crate::errors::ApiKeyExplanation;
+use std::cmp::Ordering;
 
 pub struct GscClient {
     http: blocking::Client,
@@ -105,9 +105,9 @@ impl GscClient {
         let uri = self.get_uri_for_submission(username, hw, cookie)?;
         let mut message = messages::SubmissionChange::default();
         if eval {
-            message.eval_date = Some(datetime.to_owned());
+            message.eval_date = Some(datetime.parse()?);
         } else {
-            message.due_date = Some(datetime.to_owned());
+            message.due_date = Some(datetime.parse()?);
         }
         let request = self.http.patch(&uri).json(&message);
         let response = self.send_request(request)?;
@@ -118,8 +118,7 @@ impl GscClient {
         let cookie = self.load_cookie_file()?;
         let uri = self.get_uri_for_submission(username, hw, cookie)?;
         let request = self.http.get(&uri);
-        let submission: messages::Submission =
-            self.send_request(request)?.json()?;
+        let submission: messages::Submission = self.send_request(request)?.json()?;
 
         let uri = format!(
             "{}{}/{}/self",
@@ -322,8 +321,9 @@ impl GscClient {
 
         for src in raw_srcs {
             match src {
-                CpArg::Local(filename) => Err(
-                    ErrorKind::cannot_copy_local_to_local(filename, dst))?,
+                CpArg::Local(filename) => {
+                    Err(ErrorKind::cannot_copy_local_to_local(filename, dst))?
+                }
                 CpArg::Remote(rpat) => src_rpats.push(rpat),
             }
         }
@@ -1021,11 +1021,7 @@ impl GscClient {
             .map(|uri| uri + "/files")
     }
 
-    fn handle_response(
-        &self,
-        response: blocking::Response,
-    ) -> Result<blocking::Response> {
-
+    fn handle_response(&self, response: blocking::Response) -> Result<blocking::Response> {
         if response.status().is_success() {
             Ok(response)
         } else {
@@ -1137,20 +1133,19 @@ impl GscClient {
     }
 }
 
-const ENCODE_SET: &'static enc::AsciiSet =
-    &enc::CONTROLS
-        .add(b' ')
-        .add(b'"')
-        .add(b'#')
-        .add(b'<')
-        .add(b'>')
-        .add(b'`')
-        .add(b'?')
-        .add(b'{')
-        .add(b'}')
-        .add(b'%')
-        .add(b'/')
-        .add(b'+');
+const ENCODE_SET: &'static enc::AsciiSet = &enc::CONTROLS
+    .add(b' ')
+    .add(b'"')
+    .add(b'#')
+    .add(b'<')
+    .add(b'>')
+    .add(b'`')
+    .add(b'?')
+    .add(b'{')
+    .add(b'}')
+    .add(b'%')
+    .add(b'/')
+    .add(b'+');
 
 fn glob(pattern: &str) -> Result<globset::GlobMatcher> {
     let real_pattern = if pattern.is_empty() { "*" } else { pattern };
@@ -1198,13 +1193,15 @@ fn check_api_key(api_key: &str, config: &config::Config) -> Result<String> {
     }
 
     match len.cmp(&KEY_LEN) {
-        Ordering::Equal => {},
-        Ordering::Less =>
-            reasons.add(format!("It’s only {} characters, but I expected {}.",
-                                len, KEY_LEN)),
-        Ordering::Greater =>
-            reasons.add(format!("It’s {} characters, but I expected only {}.",
-                                len, KEY_LEN)),
+        Ordering::Equal => {}
+        Ordering::Less => reasons.add(format!(
+            "It’s only {} characters, but I expected {}.",
+            len, KEY_LEN
+        )),
+        Ordering::Greater => reasons.add(format!(
+            "It’s {} characters, but I expected only {}.",
+            len, KEY_LEN
+        )),
     }
 
     let mut result = String::new();

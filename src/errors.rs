@@ -92,7 +92,10 @@ impl<S: Borrow<str>> fmt::Display for ApiKeyExplanation<S> {
         }
 
         if self.bad_key.is_none() {
-            writeln!(f, "\nTo see the key you entered, re-run gsc with the -v flag.")?;
+            writeln!(
+                f,
+                "\nTo see the key you entered, re-run gsc with the -v flag."
+            )?;
         }
 
         writeln!(f)
@@ -107,6 +110,7 @@ error_chain! {
         Io(std::io::Error);
         ParseInt(std::num::ParseIntError);
         ParseFloat(std::num::ParseFloatError);
+        ParseDateTime(chrono::format::ParseError);
         Reqwest(reqwest::Error);
         SerdeYaml(serde_yaml::Error);
     }
@@ -231,9 +235,7 @@ impl ErrorKind {
         Self::DestinationPatternIsMultiple(rpat.clone(), rfiles)
     }
 
-    pub fn cannot_copy_local_to_local(src: impl Into<PathBuf>,
-                                      dst: impl Into<PathBuf>) -> Self {
-
+    pub fn cannot_copy_local_to_local(src: impl Into<PathBuf>, dst: impl Into<PathBuf>) -> Self {
         lazy_static! {
             pub static ref HW_NUM: Regex = Regex::new(r"^hw\d+$").unwrap();
         }
