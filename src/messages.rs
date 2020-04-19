@@ -1,7 +1,8 @@
 use chrono::{offset, DateTime};
+use serde::Serializer;
 use serde_derive::{Deserialize, Serialize};
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug)]
 pub struct UtcDateTime(DateTime<offset::Utc>);
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -249,19 +250,19 @@ pub struct SubmissionChange {
     pub owner2: Option<()>,
 }
 
-impl UtcDateTime {
-    fn into_local(self) -> DateTime<offset::Local> {
-        self.0.into()
-    }
-
-    fn from_local(local: DateTime<offset::Local>) -> Self {
-        Self(local.into())
+impl serde::Serialize for UtcDateTime {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let str = self.0.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        serializer.serialize_str(&str)
     }
 }
 
 impl std::fmt::Display for UtcDateTime {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let local = self.clone().into_local();
+        let local = DateTime::<offset::Local>::from(self.0.clone());
         write!(f, "{}", local.format("%a %d %b, %H:%M (%z)"))
     }
 }
@@ -270,7 +271,9 @@ impl std::str::FromStr for UtcDateTime {
     type Err = chrono::format::ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse().map(Self::from_local)
+        type Fixed = DateTime<offset::FixedOffset>;
+        let fixed = Fixed::parse_from_str(s, "%Y-%m-%d %H:%M:%S %z")?;
+        Ok(Self(fixed.into()))
     }
 }
 
