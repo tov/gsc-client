@@ -18,5 +18,6 @@ if [ "$1" = -l ]; then
         --path .
 else
     cargo install --verbose --force \
-        --git https://github.com/tov/gsc-client.git
+        --git https://github.com/tov/gsc-client.git \
+        --tag current
 fi
