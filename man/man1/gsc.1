@@ -137,7 +137,8 @@ Copies files from local to remote or remote to local.
 .sss options
 .option \-a ", " \-\-all
 Allows \fR<\fISPEC\fR> to be blank, in order to download a whole
-remote homework.
+remote homework (except for logs) and recreate its directory
+structure.
 .option \-f
 Forces overwriting existing local files without asking.
 .option \-i
@@ -221,7 +222,7 @@ Download all files from remote HW1 whose name contains the word
 \[lq]\fItest\fR\[rq] into the local \fItest/\fR subdirectory:
 .sh gsc cp \[aq]hw1:*test*\[aq] test
 .PP
-Download all files from remote HW1, recreating the project
+Download all non-log files from remote HW1, recreating the project
 structure in a local subdirectory named \[lq]\fIfoobar\fR\[rq]:
 .sh gsc cp \-a hw1: foobar
 .sse
