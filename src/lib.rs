@@ -445,6 +445,8 @@ impl GscClient {
         let src_metas = self.fetch_matching_file_list(&rpat)?;
 
         for src_meta in src_metas {
+            if src_meta.purpose == messages::FilePurpose::Log { continue; }
+
             let mut file_dst = dst.to_owned();
             file_dst.push(src_meta.purpose.to_dir());
             soft_create_dir(&file_dst)?;
