@@ -1,3 +1,4 @@
+use chrono::format::{DelayedFormat, StrftimeItems};
 use chrono::{offset, DateTime};
 use serde::Serializer;
 use serde_derive::{Deserialize, Serialize};
@@ -250,6 +251,21 @@ pub struct SubmissionChange {
     pub owner2: Option<()>,
 }
 
+impl UtcDateTime {
+    pub fn into_local(self) -> DateTime<offset::Local> {
+        self.0.into()
+    }
+
+    pub fn format_local<'a>(&self, fmt: &'a str) -> DelayedFormat<StrftimeItems<'a>> {
+        self.clone().into_local().format(fmt)
+    }
+
+    // [[CC]YY]MMDDhhmm[.ss]
+    pub fn touch_t_fmt(&self) -> DelayedFormat<StrftimeItems> {
+        self.format_local("%Y%m%d%H%M.%S")
+    }
+}
+
 impl serde::Serialize for UtcDateTime {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -262,8 +278,7 @@ impl serde::Serialize for UtcDateTime {
 
 impl std::fmt::Display for UtcDateTime {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let local = DateTime::<offset::Local>::from(self.0.clone());
-        write!(f, "{}", local.format("%a %d %b, %H:%M (%z)"))
+        write!(f, "{}", self.format_local("%a %d %b, %H:%M (%z)"))
     }
 }
 

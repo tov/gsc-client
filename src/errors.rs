@@ -219,6 +219,12 @@ error_chain! {
             description("destination file exists, and flag ‘-n’ was given")
             display("Not overwriting destination file ‘{}’ (-n).", filename)
         }
+
+        SetModTimeFailed(file: PathBuf, reason: String) {
+            description("could not set file modification time to match server")
+            display("Could not set modification time for file ‘{}’.\n  reason: {}",
+                    file.display(), reason)
+        }
     }
 }
 

@@ -1,4 +1,4 @@
-#![recursion_limit = "128"]
+#![recursion_limit = "256"]
 
 use percent_encoding as enc;
 
@@ -9,6 +9,7 @@ use std::collections::{hash_map, HashMap};
 use std::io::{self, BufRead, BufReader};
 use std::ops::Deref;
 use std::path::Path;
+use std::process::Command;
 
 pub mod config;
 pub mod cookie;
@@ -432,6 +433,10 @@ impl GscClient {
         let mut response = self.send_request(request)?;
         response.copy_to(&mut file)?;
 
+        if cfg!(unix) {
+            set_file_mtime(dst, &meta.upload_time)?;
+        }
+
         Ok(())
     }
 
@@ -445,7 +450,9 @@ impl GscClient {
         let src_metas = self.fetch_matching_file_list(&rpat)?;
 
         for src_meta in src_metas {
-            if src_meta.purpose == messages::FilePurpose::Log { continue; }
+            if src_meta.purpose == messages::FilePurpose::Log {
+                continue;
+            }
 
             let mut file_dst = dst.to_owned();
             file_dst.push(src_meta.purpose.to_dir());
@@ -1229,5 +1236,22 @@ fn soft_create_dir(path: &Path) -> Result<()> {
             io::ErrorKind::AlreadyExists => Ok(()),
             _ => Err(e)?,
         },
+    }
+}
+
+fn set_file_mtime(dst: &Path, mtime: &messages::UtcDateTime) -> Result<()> {
+    let mtime = mtime.touch_t_fmt().to_string();
+    let output = Command::new("touch")
+        .arg("-m")
+        .arg("-t")
+        .arg(mtime)
+        .arg(dst.as_os_str())
+        .output()?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let msg = String::from_utf8_lossy(&output.stderr).into_owned();
+        Err(ErrorKind::SetModTimeFailed(dst.to_owned(), msg))?
     }
 }
