@@ -434,7 +434,13 @@ impl GscClient {
         response.copy_to(&mut file)?;
 
         if cfg!(unix) {
-            set_file_mtime(dst, &meta.upload_time)?;
+            let mtime = &meta.upload_time;
+            ve2!(
+                "Setting modification time of ‘{}’ to {}",
+                dst.display(),
+                mtime.touch_t_fmt()
+            );
+            set_file_mtime(dst, mtime)?;
         }
 
         Ok(())
