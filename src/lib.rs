@@ -13,7 +13,7 @@ use std::path::Path;
 use std::process::Command;
 
 pub mod config;
-pub mod cookie;
+pub mod credentials;
 pub mod errors;
 pub mod messages;
 
