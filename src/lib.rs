@@ -41,7 +41,7 @@ pub mod prelude {
 
 pub use prelude::*;
 
-use self::cookie::*;
+use self::credentials::*;
 use self::util::{hanging, Percentage};
 use crate::errors::ApiKeyExplanation;
 use std::cmp::Ordering;
@@ -1159,19 +1159,6 @@ const ENCODE_SET: &'static enc::AsciiSet = &enc::CONTROLS
 fn glob(pattern: &str) -> Result<globset::GlobMatcher> {
     let real_pattern = if pattern.is_empty() { "*" } else { pattern };
     Ok(globset::Glob::new(real_pattern)?.compile_matcher())
-}
-
-pub fn parse_cookie(cookie: &str) -> Option<(String, String)> {
-    let pair = match cookie.find(';') {
-        Some(index) => &cookie[..index],
-        None => cookie,
-    };
-
-    pair.find('=').map(|index| {
-        let key = pair[..index].to_owned();
-        let value = pair[index + 1..].to_owned();
-        (key, value)
-    })
 }
 
 fn prompt_secret(prompt: &str, username: &str) -> Result<String> {
