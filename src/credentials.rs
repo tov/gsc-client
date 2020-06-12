@@ -63,7 +63,7 @@ impl Credentials {
         file.lock_exclusive()?;
 
         let mut w = BufWriter::new(file);
-        write!(w, "{}:{}={}", self.username_, self.cookie_key_, self.cookie_value_)?;
+        writeln!(w, "{}:{}={}", self.username_, self.cookie_key_, self.cookie_value_)?;
 
         Ok(())
     }
