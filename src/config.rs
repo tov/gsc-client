@@ -19,7 +19,7 @@ const DOTFILE_NAME: &str = ".gscrc";
 
 #[derive(Debug)]
 pub struct Config {
-    cookie_file: Option<PathBuf>,
+    credentials_file: Option<PathBuf>,
     dotfile: Option<PathBuf>,
     endpoint: String,
     on_behalf: Option<String>,
@@ -61,11 +61,11 @@ fn find_dotfile(env_var: &str, filename: &str) -> Option<PathBuf> {
 
 impl Config {
     pub fn new() -> Self {
-        let cookie_file = find_dotfile(AUTHFILE_VAR, AUTHFILE_NAME);
+        let credentials_file = find_dotfile(AUTHFILE_VAR, AUTHFILE_NAME);
         let dotfile = find_dotfile(DOTFILE_VAR, DOTFILE_NAME);
 
         Config {
-            cookie_file,
+            credentials_file,
             dotfile,
             endpoint: API_ENDPOINT.to_owned(),
             on_behalf: None,
@@ -121,8 +121,8 @@ impl Config {
         &self.endpoint
     }
 
-    pub fn get_cookie_file(&self) -> Result<&Path> {
-        match &self.cookie_file {
+    pub fn get_credentials_file(&self) -> Result<&Path> {
+        match &self.credentials_file {
             Some(filename) => Ok(&filename),
             _ => Err(ErrorKind::NoCookieFileGiven)?,
         }

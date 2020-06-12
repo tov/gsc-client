@@ -2,14 +2,74 @@ use fs2::FileExt;
 use reqwest::header::HeaderValue;
 use std::default::Default;
 use std::fmt;
-use std::fs::File;
-use std::io::{BufRead, Seek, Write};
+use std::fs::{self, File};
+use std::io::{self, BufRead, BufReader, BufWriter, Seek, Write};
 use std::path::Path;
 use vlog::*;
 
-use super::errors::*;
+use super::errors::ErrorKind;
 
-#[derive(Debug, Default)]
+type Result<T> = super::errors::Result<T>;
+
+#[derive(Clone, Debug, Default)]
+pub struct Credentials {
+    pub username:     String,
+    pub cookie_key:   String,
+    pub cookie_value: String,
+}
+
+impl Credentials {
+    pub fn new(username:     impl Into<String>,
+               cookie_key:   impl Into<String>,
+               cookie_value: impl Into<String>) -> Self {
+
+        Self {
+            username:     username.into(),
+            cookie_key:   cookie_key.into(),
+            cookie_value: cookie_value.into(),
+        }
+    }
+
+    pub fn read(path: &Path) -> Result<Self> {
+        let file = fs::File::open(path)
+            .map_err(|_| ErrorKind::LoginPlease)?;
+        file.lock_shared()?;
+
+        let mut buf_reader = BufReader::new(file);
+        let mut buf = String::new();
+        let _ = buf_reader.read_line(&mut buf);
+
+        let (username, key, value) =
+            parse_cookie_file(buf.trim_end()).ok_or(ErrorKind::LoginPlease)?;
+
+        Ok(Self {
+            username:     username.to_owned(),
+            cookie_key:   key.to_owned(),
+            cookie_value: value.to_owned(),
+        })
+    }
+
+    pub fn write(&self, filename: &Path) -> Result<()> {
+        let file = fs::OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(filename)?;
+        file.lock_exclusive()?;
+
+        let mut w = BufWriter::new(file);
+        write!(w, "{}:{}={}", self.username, self.cookie_key, self.cookie_value)?;
+
+        Ok(())
+    }
+
+    pub fn to_header(&self) -> Result<HeaderValue> {
+        let s = format!("{}={}", self.cookie_key, self.cookie_value);
+        Ok(HeaderValue::from_str(&s)?)
+    }
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct CookieContents {
     key: String,
     value: String,
@@ -83,7 +143,7 @@ fn parse_cookie_file(contents: &str) -> Option<(&str, &str, &str)> {
 
 impl CookieFile {
     pub fn new(cookie_file: &Path, username: &str) -> Result<Self> {
-        let file = std::fs::OpenOptions::new()
+        let file = fs::OpenOptions::new()
             .write(true)
             .create(true)
             .open(cookie_file)?;
@@ -98,14 +158,14 @@ impl CookieFile {
     }
 
     pub fn lock(cookie_file: &Path) -> Result<Self> {
-        let mut file = std::fs::OpenOptions::new()
+        let mut file = fs::OpenOptions::new()
             .read(true)
             .write(true)
             .open(cookie_file)
             .map_err(|_| ErrorKind::LoginPlease)?;
         file.lock_exclusive()?;
 
-        let mut buf_reader = std::io::BufReader::new(file);
+        let mut buf_reader = BufReader::new(file);
         let mut buf = String::new();
         let _ = buf_reader.read_line(&mut buf);
 
@@ -130,11 +190,6 @@ impl CookieFile {
         self.contents.to_header()
     }
 
-    pub fn set_cookie(&mut self, contents: CookieContents) {
-        self.contents = contents;
-        self.dirty = true;
-    }
-
     pub fn deauth(&mut self) {
         self.contents.clear();
         self.username.clear();
@@ -144,7 +199,7 @@ impl CookieFile {
     fn flush(&mut self) -> Result<()> {
         if self.dirty {
             self.file.set_len(0)?;
-            self.file.seek(std::io::SeekFrom::Start(0))?;
+            self.file.seek(io::SeekFrom::Start(0))?;
 
             if !self.contents.key.is_empty() {
                 let content = self.to_string();
