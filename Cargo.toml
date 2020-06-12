@@ -7,12 +7,13 @@ build = "build.rs"
 
 [features]
 admin = []
+file_locking = ["fs2"]
 
 [dependencies]
 chrono = { version = "0.4.11", features = ["serde"] }
 clap = "2.33"
 error-chain = "0.12.2"
-fs2 = "0.4.3"
+fs2 = { version = "0.4.3", optional = true }
 globset = "0.4.5"
 lazy_static = "1.4"
 percent-encoding = "2.1.0"

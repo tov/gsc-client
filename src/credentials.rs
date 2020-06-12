@@ -1,5 +1,8 @@
+#[cfg(feature = "file_locking")]
 use fs2::FileExt;
+
 use reqwest::header::HeaderValue;
+
 use std::default::Default;
 use std::fs;
 use std::io::{BufRead, BufReader, BufWriter, Write};
@@ -11,9 +14,9 @@ type Result<T> = super::errors::Result<T>;
 
 #[derive(Clone, Debug, Default)]
 pub struct Credentials {
-    pub username:     String,
-    pub cookie_key:   String,
-    pub cookie_value: String,
+    username_:     String,
+    cookie_key_:   String,
+    cookie_value_: String,
 }
 
 impl Credentials {
@@ -22,15 +25,17 @@ impl Credentials {
                cookie_value: impl Into<String>) -> Self {
 
         Self {
-            username:     username.into(),
-            cookie_key:   cookie_key.into(),
-            cookie_value: cookie_value.into(),
+            username_:     username.into(),
+            cookie_key_:   cookie_key.into(),
+            cookie_value_: cookie_value.into(),
         }
     }
 
     pub fn read(path: &Path) -> Result<Self> {
         let file = fs::File::open(path)
             .map_err(|_| ErrorKind::LoginPlease)?;
+
+        #[cfg(feature = "file_locking")]
         file.lock_shared()?;
 
         let mut buf_reader = BufReader::new(file);
@@ -41,9 +46,9 @@ impl Credentials {
             parse_cookie_file(buf.trim_end()).ok_or(ErrorKind::LoginPlease)?;
 
         Ok(Self {
-            username:     username.to_owned(),
-            cookie_key:   key.to_owned(),
-            cookie_value: value.to_owned(),
+            username_:     username.to_owned(),
+            cookie_key_:   key.to_owned(),
+            cookie_value_: value.to_owned(),
         })
     }
 
@@ -53,16 +58,22 @@ impl Credentials {
             .truncate(true)
             .write(true)
             .open(filename)?;
+
+        #[cfg(feature = "file_locking")]
         file.lock_exclusive()?;
 
         let mut w = BufWriter::new(file);
-        write!(w, "{}:{}={}", self.username, self.cookie_key, self.cookie_value)?;
+        write!(w, "{}:{}={}", self.username_, self.cookie_key_, self.cookie_value_)?;
 
         Ok(())
     }
 
+    pub fn username(&self) -> &str {
+        &self.username_
+    }
+
     pub fn to_header(&self) -> Result<HeaderValue> {
-        let s = format!("{}={}", self.cookie_key, self.cookie_value);
+        let s = format!("{}={}", self.cookie_key_, self.cookie_value_);
         Ok(HeaderValue::from_str(&s)?)
     }
 }

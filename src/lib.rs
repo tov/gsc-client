@@ -650,8 +650,8 @@ impl GscClient {
     }
 
     pub fn get_eval(&self, hw: usize, number: usize) -> Result<()> {
-        let creds = self.load_credentials()?;
-        let uri = self.get_uri_for_submission(&creds.username, hw, &creds)?;
+        let (who, creds) = self.load_effective_credentials()?;
+        let uri = self.get_uri_for_submission(&who, hw, &creds)?;
         let request = self.http.get(&uri);
         let response = self.send_request(request)?;
         let submission: messages::Submission = response.json()?;
@@ -689,8 +689,8 @@ impl GscClient {
     }
 
     pub fn set_eval(&self, hw: usize, number: usize, score: f64, explanation: &str) -> Result<()> {
-        let creds = self.load_credentials()?;
-        let uri = self.get_uri_for_submission(&creds.username, hw, &creds)?;
+        let (who, creds) = self.load_effective_credentials()?;
+        let uri = self.get_uri_for_submission(&who, hw, &creds)?;
         let request = self.http.get(&uri);
         let response = self.send_request(request)?;
         let submission: messages::Submission = response.json()?;
@@ -723,8 +723,8 @@ impl GscClient {
     }
 
     pub fn partner(&self) -> Result<()> {
-        let creds = self.load_credentials()?;
-        let uri = self.user_uri(&creds.username);
+        let (who, creds) = self.load_effective_credentials()?;
+        let uri = self.user_uri(&who);
         let request = self.http.get(&uri);
         let response = self.send_request_with_credentials(request, &creds)?;
         let user: messages::User = response.json()?;
@@ -750,8 +750,8 @@ impl GscClient {
         hw: usize,
         them: &str,
     ) -> Result<()> {
-        let creds = self.load_credentials()?;
-        let uri = self.user_uri(&creds.username);
+        let (who, creds) = self.load_effective_credentials()?;
+        let uri = self.user_uri(&who);
         let mut message = messages::UserChange::default();
         message.partner_requests = vec![messages::PartnerRequest {
             assignment_number: hw,
@@ -785,8 +785,8 @@ impl GscClient {
     }
 
     pub fn status_hw(&self, number: usize) -> Result<()> {
-        let creds = self.load_credentials()?;
-        let uri = self.get_uri_for_submission(&creds.username, number, &creds)?;
+        let (who, creds) = self.load_effective_credentials()?;
+        let uri = self.get_uri_for_submission(&who, number, &creds)?;
         let request = self.http.get(&uri);
         let response = self.send_request(request)?;
 
@@ -854,8 +854,8 @@ impl GscClient {
     }
 
     pub fn status_user(&self) -> Result<()> {
-        let creds = self.load_credentials()?;
-        let uri = self.user_uri(&creds.username);
+        let (who, creds) = self.load_effective_credentials()?;
+        let uri = self.user_uri(&who);
         let request = self.http.get(&uri);
         let response = self.send_request_with_credentials(request, &creds)?;
 
@@ -1028,8 +1028,8 @@ impl GscClient {
     }
 
     fn get_uri_for_submission_files(&self, number: usize) -> Result<String> {
-        let creds = self.load_credentials()?;
-        self.get_uri_for_submission(&creds.username, number, &creds)
+        let (who, creds) = self.load_effective_credentials()?;
+        self.get_uri_for_submission(&who, number, &creds)
             .map(|uri| uri + "/files")
     }
 
@@ -1044,6 +1044,12 @@ impl GscClient {
 
     fn load_credentials(&self) -> Result<Credentials> {
         Credentials::read(self.config.get_credentials_file()?)
+    }
+
+    fn load_effective_credentials(&self) -> Result<(String, Credentials)> {
+        let creds = self.load_credentials()?;
+        let user  = self.config.get_on_behalf().unwrap_or_else(|| creds.username());
+        Ok((user.to_owned(), creds))
     }
 
     fn save_credentials(&self, creds: &Credentials) -> Result<()> {
