@@ -12,26 +12,14 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
-      - name: Cache stable toolchain
-        uses: actions/cache@v1
+      - name: Restore cache
+        uses: actions/cache@v2
         with:
-          path: ~/.rustup
-          key: ${{ runner.os }}-toolchain-stable-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-toolchain-stable-
-      - name: Cache cargo
-        uses: actions/cache@v1
-        with:
-          path: ~/.cargo
-          key: ${{ runner.os }}-cargo-stable-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-stable-
-      - name: Cache cargo build
-        uses: actions/cache@v1
-        with:
-          path: target
-          key: ${{ runner.os }}-target-stable-${{ hashFiles('**/Cargo.lock') }}-quiet
-          restore-keys: |
-            ${{ runner.os }}-target-stable-${{ hashFiles('**/Cargo.lock') }}-
-            ${{ runner.os }}-target-stable-
+          path: |
+            ~/.rustup
+            ~/.cargo
+            target
+          key: ${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
