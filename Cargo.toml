@@ -10,7 +10,7 @@ admin = []
 file_locking = ["fs2"]
 
 [dependencies]
-chrono = { version = "0.4.11", features = ["serde"] }
+chrono = { version = "0.4.15", features = ["serde"] }
 clap = "2.33"
 error-chain = "0.12.2"
 fs2 = { version = "0.4.3", optional = true }
