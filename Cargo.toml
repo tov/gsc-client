@@ -26,7 +26,7 @@ tabular = "0.1.4"
 textwrap = { version = "0.11", features = ["term_size"] }
 thousands = "0.2.0"
 unicode-width = "0.1.8"
-reqwest = { version = "0.10.6", features = ["blocking", "json"] }
+reqwest = { version = "0.10.8", features = ["blocking", "json"] }
 rpassword = "4.0.5"
 vlog = "0.1.4"
 
