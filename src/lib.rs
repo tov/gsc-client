@@ -8,6 +8,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::{hash_map, HashMap};
 use std::fs;
 use std::io::{self, BufRead, BufReader};
+use std::iter;
 use std::ops::Deref;
 use std::path::Path;
 use std::process::Command;
@@ -617,7 +618,12 @@ impl GscClient {
                         let response = self.send_request(request)?;
                         let contents = BufReader::new(response);
 
-                        table.add_heading(format!("hw{}:{}:\n", rpat.hw, file.name));
+                        let head = format!("hw{}:{}", rpat.hw, file.name);
+                        let rule: String = iter::repeat('=').take(head.len()).collect();
+
+                        table.add_heading(head);
+                        table.add_heading(rule);
+                        table.add_heading(String::new());
 
                         for line_result in contents.lines() {
                             line_no += 1;
