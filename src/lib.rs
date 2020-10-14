@@ -608,7 +608,7 @@ impl GscClient {
                     let mut line_no = 0;
 
                     for file in files {
-                        if file.purpose == messages::FilePurpose::Resource {
+                        if ! file.purpose.is_line_numbered() {
                             continue;
                         }
 
@@ -1145,6 +1145,17 @@ impl GscClient {
     fn warn<T: std::fmt::Display>(&self, msg: T) {
         ve1!("{}", msg);
         self.had_warning.set(true);
+    }
+}
+
+impl messages::FilePurpose {
+    fn is_automatically_deletable(self) -> bool {
+        self == messages::FilePurpose::Log
+    }
+
+    fn is_line_numbered(self) -> bool {
+        self != messages::FilePurpose::Resource
+            && !self.is_automatically_deletable()
     }
 }
 
