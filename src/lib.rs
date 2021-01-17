@@ -95,6 +95,8 @@ impl GscClient {
         let uri = self.get_uri_for_submission(username, hw, &creds)?;
         let request = self.http.patch(&uri).json(&message);
         self.send_request(request)?;
+
+        v1!("Okay");
         Ok(())
     }
 
