@@ -104,14 +104,15 @@ impl GscClient {
         datetime: &str,
         eval: bool,
     ) -> Result<()> {
-        let creds = self.load_credentials()?;
-        let uri = self.get_uri_for_submission(username, hw, &creds)?;
         let mut message = messages::SubmissionChange::default();
         if eval {
             message.eval_date = Some(datetime.parse()?);
         } else {
             message.due_date = Some(datetime.parse()?);
         }
+
+        let creds = self.load_credentials()?;
+        let uri = self.get_uri_for_submission(username, hw, &creds)?;
         let request = self.http.patch(&uri).json(&message);
         let response = self.send_request(request)?;
         self.print_results(response)
