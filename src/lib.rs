@@ -94,8 +94,8 @@ impl GscClient {
         let creds = self.load_credentials()?;
         let uri = self.get_uri_for_submission(username, hw, &creds)?;
         let request = self.http.patch(&uri).json(&message);
-        let response = self.send_request(request)?;
-        self.print_results(response)
+        self.send_request(request)?;
+        Ok(())
     }
 
     pub fn admin_extend(
@@ -116,7 +116,15 @@ impl GscClient {
         let uri = self.get_uri_for_submission(username, hw, &creds)?;
         let request = self.http.patch(&uri).json(&message);
         let response = self.send_request(request)?;
-        self.print_results(response)
+        let submission: messages::Submission = response.json()?;
+
+        if eval {
+            v2!("Set eval date set to {}", submission.eval_date);
+        } else {
+            v2!("Set due date to {}", submission.due_date);
+        }
+
+        Ok(())
     }
 
     pub fn admin_permalink(&self, username: &str, hw: usize, number: usize) -> Result<()> {
