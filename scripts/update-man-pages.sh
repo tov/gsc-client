@@ -1,4 +1,4 @@
 #!/bin/sh
 
-tar c man | tar xvC "$TOV_PUB/share"
-chmod -R a+rX "$TOV_PUB/share/man"
+tar c man | tar xvC "$PUB211/share"
+chmod -R a+rX "$PUB211/share/man"
