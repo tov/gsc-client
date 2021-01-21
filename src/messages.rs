@@ -155,8 +155,9 @@ pub struct SelfEval {
 pub enum SubmissionStatus {
     Future,
     Open,
-    SelfEval,
     Extended,
+    Overtime,
+    SelfEval,
     ExtendedEval,
     Closed,
 }
@@ -298,8 +299,9 @@ impl SubmissionStatus {
         match *self {
             Future => "future",
             Open => "open for submission",
-            SelfEval => "open for self evaluation",
             Extended => "open for submission (extended)",
+            Overtime => "overtime submission or self-eval",
+            SelfEval => "open for self evaluation",
             ExtendedEval => "open for self evaluation (extended)",
             Closed => "closed",
         }
@@ -308,6 +310,7 @@ impl SubmissionStatus {
     pub fn is_self_eval(&self) -> bool {
         use self::SubmissionStatus::*;
         match *self {
+            Overtime => true,
             SelfEval => true,
             ExtendedEval => true,
             _ => false,
