@@ -1,6 +1,6 @@
 [package]
 name = "gsc-client"
-version = "0.7.2-alpha.0"
+version = "0.8.0"
 description = "Command line interface to the GSC homework server"
 authors = ["Jesse A. Tov <jesse@cs.northwestern.edu>"]
 edition = "2018"
