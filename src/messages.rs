@@ -64,6 +64,7 @@ pub enum GraderEvalStatus {
     Editing,
     HeldBack,
     Ready,
+    Regrade,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
