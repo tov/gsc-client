@@ -4,20 +4,27 @@ set -x
 
 umask 022
 
-"$(dirname $0)/update-man-pages.sh"
+git_uri='https://github.com/tov/gsc-client.git'
+install_source="--git ${git_uri} --branch release"
+install_params=
 
-# OPENSSL_STATIC=yes
-# export OPENSSL_STATIC
-# OPENSSL_INCLUDE_DIR=$TOV_PUB/include
-# export OPENSSL_INCLUDE_DIR
-# OPENSSL_LIB_DIR=$TOV_PUB/lib64
-# export OPENSSL_LIB_DIR
+while [ $# -gt 0 ]; do
+    case $1 in
+        (-l)
+            install_source='--path .'
+            shift
+            ;;
+        (*)
+            echo >&2 "Didn’t understand ‘$1’"
+            exit 1
+            ;;
+    esac
+done
 
-if [ "$1" = -l ]; then
-    cargo install --verbose --force \
-        --path .
+if [ -n "${PUB211-}" ]; then
+    "$(dirname $0)/update-man-pages.sh"
 else
-    cargo install --verbose --force \
-        --git https://github.com/tov/gsc-client.git \
-        --tag current
+    install_params=--all-features
 fi
+
+cargo install --force $install_source $install_params
