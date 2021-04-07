@@ -126,6 +126,28 @@ pub enum UserRole {
     Admin,
 }
 
+impl UserRole {
+    fn as_str(self) -> &'static str {
+        match self {
+            UserRole::Student => "student",
+            UserRole::Grader  => "grader",
+            UserRole::Admin   => "admin",
+        }
+    }
+}
+
+impl std::fmt::Display for UserRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+#[derive(Serialize, Debug)]
+pub struct UserCreate<'a> {
+    pub name: &'a str,
+    pub role: UserRole,
+}
+
 #[derive(Deserialize, Debug)]
 pub struct UserShort {
     pub name: String,

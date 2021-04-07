@@ -1,4 +1,5 @@
 use gsc_client::config;
+use gsc_client::messages::UserRole;
 use gsc_client::prelude::*;
 
 use std::error::Error;
@@ -29,6 +30,13 @@ fn main() {
 }
 
 enum Command {
+    AdminAddUser {
+        user: String,
+        role: UserRole,
+    },
+    AdminDelUser {
+        user: String,
+    },
     AdminCsv,
     AdminDivorce {
         user: String,
@@ -129,6 +137,8 @@ fn do_it() -> Result<bool> {
     use self::Command::*;
 
     match command {
+        AdminAddUser { user, role } => client.admin_add_user(&user, role),
+        AdminDelUser { user } => client.admin_del_user(&user),
         AdminCsv => client.admin_csv(),
         AdminDivorce { user, hw } => client.admin_divorce(&user, hw),
         AdminExtend {
@@ -221,7 +231,23 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
         if let Some(submatches) = matches.subcommand_matches("admin") {
             process_common(submatches, config);
 
-            if let Some(subsubmatches) = submatches.subcommand_matches("csv") {
+            if let Some(subsubmatches) = submatches.subcommand_matches("add_user") {
+                process_common(subsubmatches, config);
+                let user = subsubmatches.value_of("USER").unwrap().to_owned();
+                let role =
+                    if subsubmatches.is_present("GRADER_ROLE") {
+                        UserRole::Grader
+                    } else if subsubmatches.is_present("ADMIN_ROLE") {
+                        UserRole::Admin
+                    } else {
+                        UserRole::Student
+                    };
+                Ok(Command::AdminAddUser { user, role })
+            } else if let Some(subsubmatches) = submatches.subcommand_matches("del_user") {
+                process_common(subsubmatches, config);
+                let user = subsubmatches.value_of("USER").unwrap().to_owned();
+                Ok(Command::AdminDelUser { user })
+            } else if let Some(subsubmatches) = submatches.subcommand_matches("csv") {
                 process_common(subsubmatches, config);
                 Ok(Command::AdminCsv)
             } else if let Some(subsubmatches) = submatches.subcommand_matches("divorce") {

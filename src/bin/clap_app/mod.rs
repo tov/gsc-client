@@ -118,6 +118,7 @@ pub fn build_cli() -> App<'static, 'static> {
 trait AppExt {
     fn add_admin(self) -> Self;
     fn add_common(self) -> Self;
+    fn add_everywhere(self) -> Self;
     fn add_overwrite_opts(self) -> Self;
     fn add_partner_args(self) -> Self;
     fn add_user_opt(self) -> Self;
@@ -145,6 +146,28 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
                     SubCommand::with_name("csv")
                         .about("Prints the grade spreadsheet")
                         .add_common(),
+                )
+                .subcommand(
+                    SubCommand::with_name("add_user")
+                        .about("Adds a user")
+                        .add_everywhere()
+                        .req_arg("USER", "Name of user to add")
+                        .arg(clap::Arg::with_name("GRADER_ROLE")
+                            .long("grader")
+                            .takes_value(false)
+                            .conflicts_with("ADMIN_ROLE")
+                            .help("Creates user with grader role"))
+                        .arg(clap::Arg::with_name("ADMIN_ROLE")
+                            .long("admin")
+                            .takes_value(false)
+                            .conflicts_with("GRADER_ROLE")
+                            .help("Creates user with admin role")),
+                )
+                .subcommand(
+                    SubCommand::with_name("del_user")
+                        .about("Deletes a user")
+                        .add_everywhere()
+                        .req_arg("USER", "Name of user to delete"),
                 )
                 .subcommand(
                     SubCommand::with_name("divorce")
@@ -223,7 +246,7 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
         self
     }
 
-    fn add_common(self) -> Self {
+    fn add_everywhere(self) -> Self {
         self.arg(
             clap::Arg::with_name("VERBOSE")
                 .short("v")
@@ -240,7 +263,10 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
                 .takes_value(false)
                 .help("Makes the output quieter"),
         )
-        .arg(
+    }
+
+    fn add_common(self) -> Self {
+        self.arg(
             clap::Arg::with_name("JSON")
                 .short("j")
                 .long("json")
@@ -254,6 +280,7 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
                 .takes_value(false)
                 .help("Show human-formatted result (overrides --json)"),
         )
+        .add_everywhere()
         .add_user_opt()
     }
 

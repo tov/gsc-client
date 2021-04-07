@@ -100,6 +100,31 @@ impl GscClient {
         Ok(())
     }
 
+    pub fn admin_add_user(&self, name: &str, role: messages::UserRole) -> Result<()> {
+        let uri = format!("{}/api/users", self.config.get_endpoint());
+        let message = messages::UserCreate {name, role};
+        let request = self.http.post(&uri).json(&message);
+        v2!("Creating user {} with role {}...", name, role);
+        let response = self.send_request(request)?;
+
+        if self.config.json_output() {
+            v1!("{}", response.text()?);
+        } else {
+            let result: messages::UserShort = response.json()?;
+            v1!("Created user {}.", result.name);
+        }
+
+        Ok(())
+    }
+
+    pub fn admin_del_user(&self, name: &str) -> Result<()> {
+        let uri = self.user_uri(name);
+        let request = self.http.delete(&uri);
+        v2!("Deleting user {}...", name);
+        self.send_request(request)?;
+        Ok(())
+    }
+
     pub fn admin_extend(
         &self,
         username: &str,
