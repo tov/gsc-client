@@ -7,7 +7,6 @@ use std::{
 use super::prelude::*;
 
 use serde_derive::Deserialize;
-use serde_yaml;
 
 const API_ENDPOINT: &str = "https://cs211.cs.northwestern.edu";
 
