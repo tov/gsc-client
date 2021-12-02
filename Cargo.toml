@@ -13,7 +13,7 @@ file_locking = ["fs2"]
 
 [dependencies]
 chrono = { version = "0.4.19", features = ["serde"] }
-clap = "2.33"
+clap = "2.34"
 error-chain = "0.12.4"
 fs2 = { version = "0.4.3", optional = true }
 globset = "0.4.6"
@@ -33,4 +33,4 @@ rpassword = "5.0.1"
 vlog = "0.1.4"
 
 [build-dependencies]
-clap = "2.33"
+clap = "2.34"
