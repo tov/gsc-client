@@ -397,10 +397,9 @@ impl GscClient {
                 let src_rpat = src_rpats[0];
 
                 if src_rpat.is_whole_hw() {
-                    return Err(ErrorKind::SourceHwToDestinationFile(
-                        src_rpat.hw,
-                        dst.to_owned(),
-                    ).into());
+                    return Err(
+                        ErrorKind::SourceHwToDestinationFile(src_rpat.hw, dst.to_owned()).into(),
+                    );
                 } else {
                     let src_file = self.fetch_one_matching_filename(src_rpat)?;
                     if policy.confirm_overwrite(|| dst.display())? {
@@ -514,14 +513,12 @@ impl GscClient {
 
         for src in raw_srcs {
             match src {
-                CpArg::Local(filename) =>
-                    srcs.push(filename),
-                CpArg::Remote(rpat) =>
+                CpArg::Local(filename) => srcs.push(filename),
+                CpArg::Remote(rpat) => {
                     return Err(
-                        ErrorKind::CannotCopyRemoteToRemote(
-                            rpat.clone(),
-                            dst.clone(),
-                        ).into()),
+                        ErrorKind::CannotCopyRemoteToRemote(rpat.clone(), dst.clone()).into(),
+                    )
+                }
             }
         }
 
@@ -1064,9 +1061,7 @@ impl GscClient {
         let mut cache = self.submission_uris.borrow_mut();
         let uris = match cache.entry(user.to_owned()) {
             hash_map::Entry::Occupied(entry) => entry.into_mut(),
-            hash_map::Entry::Vacant(entry) => {
-                entry.insert(self.get_submission_uris(user, creds)?)
-            }
+            hash_map::Entry::Vacant(entry) => entry.insert(self.get_submission_uris(user, creds)?),
         };
 
         match uris.get(number) {
