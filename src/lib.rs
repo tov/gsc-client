@@ -8,7 +8,6 @@ use std::cell::{Cell, RefCell};
 use std::collections::{hash_map, HashMap};
 use std::fs;
 use std::io::{self, BufRead, BufReader};
-use std::iter;
 use std::ops::Deref;
 use std::path::Path;
 use std::process::Command;
@@ -88,8 +87,10 @@ impl GscClient {
     }
 
     pub fn admin_divorce(&self, username: &str, hw: usize) -> Result<()> {
-        let mut message = messages::SubmissionChange::default();
-        message.owner2 = Some(());
+        let message = messages::SubmissionChange {
+            owner2: Some(()),
+            ..Default::default()
+        };
 
         let creds = self.load_credentials()?;
         let uri = self.get_uri_for_submission(username, hw, &creds)?;
@@ -247,9 +248,8 @@ impl GscClient {
         let eval = self
             .get_evals(username, hw)?
             .into_iter()
-            .filter(|eval| eval.sequence == number)
-            .next()
-            .ok_or_else(|| ErrorKind::EvalItemDoesNotExist(hw, number))?;
+            .find(|eval| eval.sequence == number)
+            .ok_or(ErrorKind::EvalItemDoesNotExist(hw, number))?;
         self.set_grade(username, hw, &eval, score, comment)
     }
 
@@ -277,12 +277,15 @@ impl GscClient {
         possible: usize,
     ) -> Result<()> {
         let uri = self.user_uri(username);
-        let mut message = messages::UserChange::default();
-        message.exam_grades = vec![messages::ExamGrade {
-            number,
-            points,
-            possible,
-        }];
+        let message = messages::UserChange {
+            exam_grades: vec![messages::ExamGrade {
+                number,
+                points,
+                possible,
+            }],
+            ..Default::default()
+        };
+
         let request = self.http.patch(&uri).json(&message);
         let response = self.send_request(request)?;
         self.print_results(response)
@@ -341,7 +344,7 @@ impl GscClient {
                 Err(e @ Error(ErrorKind::ServerError(JsonStatus { status: 401, .. }), _)) => {
                     eprintln!("{}", e)
                 }
-                Err(e) => return Err(e.into()),
+                Err(e) => return Err(e),
             }
         }
     }
@@ -359,7 +362,7 @@ impl GscClient {
         for src in raw_srcs {
             match src {
                 CpArg::Local(filename) => {
-                    Err(ErrorKind::cannot_copy_local_to_local(filename, dst))?
+                    return Err(ErrorKind::cannot_copy_local_to_local(filename, dst).into());
                 }
                 CpArg::Remote(rpat) => src_rpats.push(rpat),
             }
@@ -374,15 +377,13 @@ impl GscClient {
         let dst_type = match dst.metadata() {
             Err(e) => match e.kind() {
                 io::ErrorKind::NotFound => DstType::DoesNotExist,
-                _ => Err(e)?,
+                _ => return Err(e.into()),
             },
-            Ok(metadata) => {
-                if metadata.is_dir() {
-                    DstType::Dir
-                } else {
-                    DstType::File
-                }
-            }
+
+            Ok(metadata) => match metadata.is_dir() {
+                true => DstType::Dir,
+                false => DstType::File,
+            },
         };
 
         let policy = &mut self.config.get_overwrite_policy();
@@ -390,16 +391,16 @@ impl GscClient {
         match dst_type {
             DstType::File => {
                 if src_rpats.len() != 1 {
-                    Err(ErrorKind::MultipleSourcesOneDestination)?;
+                    return Err(ErrorKind::MultipleSourcesOneDestination.into());
                 }
 
                 let src_rpat = src_rpats[0];
 
                 if src_rpat.is_whole_hw() {
-                    Err(ErrorKind::SourceHwToDestinationFile(
+                    return Err(ErrorKind::SourceHwToDestinationFile(
                         src_rpat.hw,
                         dst.to_owned(),
-                    ))?;
+                    ).into());
                 } else {
                     let src_file = self.fetch_one_matching_filename(src_rpat)?;
                     if policy.confirm_overwrite(|| dst.display())? {
@@ -410,7 +411,7 @@ impl GscClient {
 
             DstType::DoesNotExist => {
                 if src_rpats.len() != 1 {
-                    Err(ErrorKind::MultipleSourcesOneDestination)?;
+                    return Err(ErrorKind::MultipleSourcesOneDestination.into());
                 }
 
                 let src_rpat = src_rpats[0];
@@ -513,17 +514,20 @@ impl GscClient {
 
         for src in raw_srcs {
             match src {
-                CpArg::Local(filename) => srcs.push(filename),
-                CpArg::Remote(rpat) => Err(ErrorKind::CannotCopyRemoteToRemote(
-                    rpat.clone(),
-                    dst.clone(),
-                ))?,
+                CpArg::Local(filename) =>
+                    srcs.push(filename),
+                CpArg::Remote(rpat) =>
+                    return Err(
+                        ErrorKind::CannotCopyRemoteToRemote(
+                            rpat.clone(),
+                            dst.clone(),
+                        ).into()),
             }
         }
 
         if dst.is_whole_hw() {
             for src in srcs {
-                let filename = match self.get_base_filename(&src) {
+                let filename = match self.get_base_filename(src) {
                     Ok(s) => s,
                     Err(e) => {
                         self.warn(e);
@@ -536,14 +540,14 @@ impl GscClient {
             let src = if srcs.len() == 1 {
                 &srcs[0]
             } else {
-                Err(ErrorKind::MultipleSourcesOneDestination)?
+                return Err(ErrorKind::MultipleSourcesOneDestination.into());
             };
 
             let dsts = self.fetch_matching_file_list(dst)?;
             let filename = match dsts.len() {
                 0 => &dst.name,
                 1 => &dsts[0].name,
-                _ => Err(Error::dest_pat_is_multiple(dst, &dsts))?,
+                _ => return Err(Error::dest_pat_is_multiple(dst, &dsts)),
             };
 
             self.upload_file(src, &dst.with_name(filename))?;
@@ -613,7 +617,7 @@ impl GscClient {
                         if e.status == 200 {
                             Ok("Deauthenticated with server.")
                         } else {
-                            Err(format!("Could not deauthenticate with server."))
+                            Err(String::from("Could not deauthenticate with server."))
                         }
                     }
                     Err(e) => Err(format!("Could not understand JSON from server:\n  {}", e)),
@@ -639,7 +643,7 @@ impl GscClient {
     pub fn cat(&self, rpats: &[RemotePattern]) -> Result<()> {
         for rpat in rpats {
             self.try_warn(|| {
-                let files = self.fetch_nonempty_matching_file_list(&rpat)?;
+                let files = self.fetch_nonempty_matching_file_list(rpat)?;
 
                 if rpat.is_whole_hw() {
                     let mut table = tabular::Table::new("{:>}  {:<}");
@@ -656,7 +660,7 @@ impl GscClient {
                         let contents = BufReader::new(response);
 
                         let head = format!("hw{}:{}", rpat.hw, file.name);
-                        let rule: String = iter::repeat('=').take(head.len()).collect();
+                        let rule: String = "=".repeat(head.len());
 
                         table.add_heading(head);
                         table.add_heading(rule);
@@ -795,12 +799,14 @@ impl GscClient {
     ) -> Result<()> {
         let (who, creds) = self.load_effective_credentials()?;
         let uri = self.user_uri(&who);
-        let mut message = messages::UserChange::default();
-        message.partner_requests = vec![messages::PartnerRequest {
-            assignment_number: hw,
-            user:              them.to_owned(),
-            status:            op,
-        }];
+        let message = messages::UserChange {
+            partner_requests: vec![messages::PartnerRequest {
+                assignment_number: hw,
+                user:              them.to_owned(),
+                status:            op,
+            }],
+            ..Default::default()
+        };
 
         let request = self.http.patch(&uri).json(&message);
         let response = self.send_request_with_credentials(request, &creds)?;
@@ -810,7 +816,7 @@ impl GscClient {
     pub fn rm(&self, pats: &[RemotePattern]) -> Result<()> {
         for rpat in pats {
             self.try_warn(|| {
-                let files = self.fetch_nonempty_matching_file_list(&rpat)?;
+                let files = self.fetch_nonempty_matching_file_list(rpat)?;
 
                 for file in files {
                     let uri = format!("{}{}", self.config.get_endpoint(), file.uri);
@@ -980,8 +986,7 @@ impl GscClient {
 
         files
             .into_iter()
-            .filter(|file| file.name == name)
-            .next()
+            .find(|file| file.name == name)
             .ok_or_else(|| ErrorKind::NoSuchRemoteFile(RemotePattern::hw_name(hw, name)).into())
     }
 
@@ -1004,7 +1009,7 @@ impl GscClient {
         let result = self.fetch_matching_file_list(rpat)?;
 
         if result.is_empty() {
-            Err(ErrorKind::NoSuchRemoteFile(rpat.clone()))?
+            Err(ErrorKind::NoSuchRemoteFile(rpat.clone()).into())
         } else {
             Ok(result)
         }
@@ -1014,9 +1019,9 @@ impl GscClient {
         let mut files = self.fetch_matching_file_list(rpat)?;
 
         match files.len() {
-            0 => Err(ErrorKind::NoSuchRemoteFile(rpat.clone()))?,
+            0 => Err(ErrorKind::NoSuchRemoteFile(rpat.clone()).into()),
             1 => Ok(files.pop().unwrap()),
-            _ => Err(ErrorKind::MultipleSourcesOneDestination)?,
+            _ => Err(ErrorKind::MultipleSourcesOneDestination.into()),
         }
     }
 
@@ -1027,7 +1032,7 @@ impl GscClient {
     ) -> Result<Vec<messages::SubmissionShort>> {
         let uri = self.user_uri(user) + "/submissions";
         let request = self.http.get(&uri);
-        let response = self.send_request_with_credentials(request, &creds)?;
+        let response = self.send_request_with_credentials(request, creds)?;
         response
             .json()
             .chain_err(|| "Could not understand response from server")
@@ -1060,7 +1065,7 @@ impl GscClient {
         let uris = match cache.entry(user.to_owned()) {
             hash_map::Entry::Occupied(entry) => entry.into_mut(),
             hash_map::Entry::Vacant(entry) => {
-                entry.insert(self.get_submission_uris(&user, &creds)?)
+                entry.insert(self.get_submission_uris(user, creds)?)
             }
         };
 
@@ -1081,7 +1086,7 @@ impl GscClient {
             Ok(response)
         } else {
             let error = response.json()?;
-            Err(ErrorKind::ServerError(error))?
+            Err(ErrorKind::ServerError(error).into())
         }
     }
 
@@ -1151,7 +1156,7 @@ impl GscClient {
             match result {
                 messages::JsonResult::Success(msg) => v2!("{}", msg),
                 messages::JsonResult::Failure(msg) => self.warn(msg),
-                messages::JsonResult::Nested(vec) => self.print_results_helper(&vec),
+                messages::JsonResult::Nested(vec) => self.print_results_helper(vec),
             }
         }
     }
@@ -1170,7 +1175,7 @@ impl GscClient {
         mut req_builder: blocking::RequestBuilder,
         creds: &Credentials,
     ) -> Result<blocking::Response> {
-        req_builder = self.add_credentials(req_builder, &creds)?;
+        req_builder = self.add_credentials(req_builder, creds)?;
         let request = req_builder.build()?;
         ve3!("> Sending request to {}", request.url());
         let response = self.http.execute(request)?;
@@ -1204,7 +1209,7 @@ impl messages::FilePurpose {
     }
 }
 
-const ENCODE_SET: &'static enc::AsciiSet = &enc::CONTROLS
+const ENCODE_SET: &enc::AsciiSet = &enc::CONTROLS
     .add(b' ')
     .add(b'"')
     .add(b'#')
@@ -1238,7 +1243,7 @@ fn check_api_key(api_key: &str, config: &config::Config) -> Result<String> {
         ApiKeyExplanation::new()
     };
 
-    if api_key.len() == 0 {
+    if api_key.is_empty() {
         return reasons.final_straw("It’s empty!");
     }
 
@@ -1283,7 +1288,7 @@ fn soft_create_dir(path: &Path) -> Result<()> {
         Ok(_) => Ok(()),
         Err(e) => match e.kind() {
             io::ErrorKind::AlreadyExists => Ok(()),
-            _ => Err(e)?,
+            _ => Err(e.into()),
         },
     }
 }
@@ -1301,6 +1306,6 @@ fn set_file_mtime(dst: &Path, mtime: &messages::UtcDateTime) -> Result<()> {
         Ok(())
     } else {
         let msg = String::from_utf8_lossy(&output.stderr).into_owned();
-        Err(ErrorKind::SetModTimeFailed(dst.to_owned(), msg))?
+        Err(ErrorKind::SetModTimeFailed(dst.to_owned(), msg).into())
     }
 }

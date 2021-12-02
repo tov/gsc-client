@@ -1,5 +1,4 @@
 use std::fmt::{Display, Formatter, Result};
-use textwrap;
 
 pub struct Percentage(pub f64);
 

@@ -67,6 +67,12 @@ impl<'a> ApiKeyExplanation<&'a str> {
     }
 }
 
+impl<'a> Default for ApiKeyExplanation<&'a str> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<S: Borrow<str>> fmt::Display for ApiKeyExplanation<S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         const SHOW_LEN: usize = 30;
@@ -276,7 +282,7 @@ impl Error {
 impl std::fmt::Display for RemoteFiles {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for filename in &self.0 {
-            write!(f, " - {}\n", filename)?;
+            writeln!(f, " - {}", filename)?;
         }
 
         Ok(())

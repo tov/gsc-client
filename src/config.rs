@@ -59,12 +59,18 @@ fn find_dotfile(env_var: &str, filename: &str) -> Option<PathBuf> {
     }
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Config {
     pub fn new() -> Self {
         let credentials_file = find_dotfile(AUTHFILE_VAR, AUTHFILE_NAME);
         let dotfile = find_dotfile(DOTFILE_VAR, DOTFILE_NAME);
 
-        Config {
+        Self {
             credentials_file,
             dotfile,
             endpoint: API_ENDPOINT.to_owned(),
@@ -76,7 +82,7 @@ impl Config {
     }
 
     pub fn get_on_behalf(&self) -> Option<&str> {
-        self.on_behalf.as_ref().map(String::as_str)
+        self.on_behalf.as_deref()
     }
 
     pub fn set_on_behalf(&mut self, username: String) {
@@ -122,14 +128,13 @@ impl Config {
     }
 
     pub fn get_credentials_file(&self) -> Result<&Path> {
-        match &self.credentials_file {
-            Some(filename) => Ok(&filename),
-            _ => Err(ErrorKind::NoCookieFileGiven)?,
-        }
+        self.credentials_file
+            .as_deref()
+            .ok_or_else(|| ErrorKind::NoCookieFileGiven.into())
     }
 
     pub fn get_dotfile(&self) -> Option<&Path> {
-        self.dotfile.as_ref().map(PathBuf::as_path)
+        self.dotfile.as_deref()
     }
 
     pub fn read_dotfile(&self) -> Result<Option<Dotfile>> {
@@ -175,15 +180,15 @@ impl Config {
 }
 
 impl OverwritePolicy {
-    pub fn confirm_overwrite<D: fmt::Display, F: FnOnce() -> D>(
+    pub fn confirm_overwrite<D: fmt::Display>(
         &mut self,
-        dst_thunk: F,
+        dst_thunk: impl FnOnce() -> D,
     ) -> Result<bool> {
         use OverwritePolicy::*;
 
         match *self {
             Always => Ok(true),
-            Never => Err(ErrorKind::DestinationFileExists(dst_thunk().to_string()))?,
+            Never => Err(ErrorKind::DestinationFileExists(dst_thunk().to_string()).into()),
             Ask => {
                 let stdin = io::stdin();
                 let mut input = stdin.lock();

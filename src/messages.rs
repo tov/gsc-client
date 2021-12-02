@@ -243,7 +243,7 @@ pub struct FileMetaChange {
 
 impl std::fmt::Display for FileMetaChange {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let name = self.name.as_ref().map(String::as_str).unwrap_or("");
+        let name = self.name.as_deref().unwrap_or("");
         match self.hw {
             Some(hw) => write!(f, "hw{}:{}", hw, name),
             None => write!(f, ":{}", name),
@@ -317,9 +317,9 @@ impl std::str::FromStr for UtcDateTime {
 }
 
 impl SubmissionStatus {
-    fn to_str(&self) -> &'static str {
+    fn to_str(self) -> &'static str {
         use self::SubmissionStatus::*;
-        match *self {
+        match self {
             Future => "future",
             Open => "open for submission",
             Extended => "open for submission (extended)",
@@ -330,14 +330,9 @@ impl SubmissionStatus {
         }
     }
 
-    pub fn is_self_eval(&self) -> bool {
+    pub fn is_self_eval(self) -> bool {
         use self::SubmissionStatus::*;
-        match *self {
-            Overtime => true,
-            SelfEval => true,
-            ExtendedEval => true,
-            _ => false,
-        }
+        matches!(self, Overtime | SelfEval | ExtendedEval)
     }
 }
 
@@ -348,9 +343,9 @@ impl std::fmt::Display for SubmissionStatus {
 }
 
 impl SubmissionEvalStatus {
-    fn to_str(&self) -> &'static str {
+    fn to_str(self) -> &'static str {
         use self::SubmissionEvalStatus::*;
-        match *self {
+        match self {
             Empty => "empty",
             Started => "started",
             Overdue => "overdue",

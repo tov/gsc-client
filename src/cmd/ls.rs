@@ -20,7 +20,7 @@ impl GscClient {
 
         for rpat in rpats {
             self.try_warn(|| {
-                let files = self.fetch_nonempty_matching_file_list(&rpat)?;
+                let files = self.fetch_nonempty_matching_file_list(rpat)?;
 
                 if rpats.len() > 1 {
                     v1!("{}:", rpat);

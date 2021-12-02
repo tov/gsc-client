@@ -345,7 +345,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 let rpat = parse_hw_opt_file(arg)?;
 
                 if rpat.is_whole_hw() && !all {
-                    Err(ErrorKind::CommandRequiresFlag("cat".to_owned()))?;
+                    return Err(ErrorKind::CommandRequiresFlag("cat".to_owned()).into());
                 }
 
                 rpats.push(rpat);
@@ -356,7 +356,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             process_common(submatches, config);
             let all = submatches.is_present("ALL");
 
-            process_overwrite_opts(&submatches, config);
+            process_overwrite_opts(submatches, config);
 
             let mut srcs = Vec::new();
             let dst = parse_cp_arg(submatches.value_of("DST").unwrap())?;
@@ -365,7 +365,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 let arg = parse_cp_arg(src)?;
 
                 if arg.is_whole_hw() && !all {
-                    Err(ErrorKind::CommandRequiresFlag("cp".to_owned()))?;
+                    return Err(ErrorKind::CommandRequiresFlag("cp".to_owned()).into());
                 }
 
                 srcs.push(arg);
@@ -454,7 +454,7 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
                 let rpat = parse_hw_opt_file(arg)?;
 
                 if rpat.is_whole_hw() && !all {
-                    Err(ErrorKind::CommandRequiresFlag("rm".to_owned()))?;
+                    return Err(ErrorKind::CommandRequiresFlag("rm".to_owned()).into());
                 }
 
                 rpats.push(rpat);
@@ -512,7 +512,7 @@ fn parse_hw(spec: &str) -> Result<usize> {
     {
         Ok(i)
     } else {
-        Err(ErrorKind::syntax("homework spec", spec))?
+        Err(ErrorKind::syntax("homework spec", spec).into())
     }
 }
 
@@ -540,7 +540,7 @@ fn parse_hw_file(file_spec: &str) -> Result<RemotePattern> {
 
 fn parse_remote_dest(spec: &str) -> Result<RemoteDestination> {
     if spec.is_empty() {
-        Err(ErrorKind::syntax("remote file or assignment name", spec))?;
+        return Err(ErrorKind::syntax("remote file or assignment name", spec).into());
     }
 
     let result = if let Ok(hw) = parse_hw(spec) {
@@ -556,11 +556,11 @@ fn parse_remote_dest(spec: &str) -> Result<RemoteDestination> {
 
 fn parse_cp_arg(spec: &str) -> Result<CpArg> {
     if spec.is_empty() {
-        Err(ErrorKind::syntax("file name", spec))?
+        Err(ErrorKind::syntax("file name", spec).into())
     } else if let Some(captures) = re::LOCAL_FILE.captures(spec) {
         let filename = captures.get(1).unwrap().as_str().to_owned();
         Ok(CpArg::Local(filename.into()))
-    } else if let Some(_) = spec.find(':') {
+    } else if spec.find(':').is_some() {
         let rp = parse_hw_file(spec)?;
         Ok(CpArg::Remote(rp))
     } else {
