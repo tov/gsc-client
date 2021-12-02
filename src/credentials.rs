@@ -20,10 +20,11 @@ pub struct Credentials {
 }
 
 impl Credentials {
-    pub fn new(username:     impl Into<String>,
-               cookie_key:   impl Into<String>,
-               cookie_value: impl Into<String>) -> Self {
-
+    pub fn new(
+        username: impl Into<String>,
+        cookie_key: impl Into<String>,
+        cookie_value: impl Into<String>,
+    ) -> Self {
         Self {
             username_:     username.into(),
             cookie_key_:   cookie_key.into(),
@@ -32,8 +33,7 @@ impl Credentials {
     }
 
     pub fn read(path: &Path) -> Result<Self> {
-        let file = fs::File::open(path)
-            .map_err(|_| ErrorKind::LoginPlease)?;
+        let file = fs::File::open(path).map_err(|_| ErrorKind::LoginPlease)?;
 
         #[cfg(feature = "file_locking")]
         file.lock_shared()?;
@@ -63,7 +63,11 @@ impl Credentials {
         file.lock_exclusive()?;
 
         let mut w = BufWriter::new(file);
-        writeln!(w, "{}:{}={}", self.username_, self.cookie_key_, self.cookie_value_)?;
+        writeln!(
+            w,
+            "{}:{}={}",
+            self.username_, self.cookie_key_, self.cookie_value_
+        )?;
 
         Ok(())
     }
@@ -90,4 +94,3 @@ fn parse_cookie_file(contents: &str) -> Option<(&str, &str, &str)> {
         &contents[equals + 1..],
     ))
 }
-

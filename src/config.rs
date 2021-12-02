@@ -20,12 +20,12 @@ const DOTFILE_NAME: &str = ".gscrc";
 #[derive(Debug)]
 pub struct Config {
     credentials_file: Option<PathBuf>,
-    dotfile: Option<PathBuf>,
-    endpoint: String,
-    on_behalf: Option<String>,
-    overwrite: OverwritePolicy,
-    verbosity: isize,
-    json_output: bool,
+    dotfile:          Option<PathBuf>,
+    endpoint:         String,
+    on_behalf:        Option<String>,
+    overwrite:        OverwritePolicy,
+    verbosity:        isize,
+    json_output:      bool,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -40,7 +40,7 @@ pub enum OverwritePolicy {
 #[serde(deny_unknown_fields)]
 pub struct Dotfile {
     #[serde(default)]
-    pub endpoint: String,
+    pub endpoint:  String,
     #[serde(default)]
     pub verbosity: Option<isize>,
 }

@@ -40,41 +40,41 @@ enum Command {
     AdminCsv,
     AdminDivorce {
         user: String,
-        hw: usize,
+        hw:   usize,
     },
     AdminExtend {
         user: String,
-        hw: usize,
+        hw:   usize,
         date: String,
         eval: bool,
     },
     AdminPartners {
         user: String,
-        hw: usize,
+        hw:   usize,
     },
     AdminPermalink {
-        user: String,
-        hw: usize,
+        user:   String,
+        hw:     usize,
         number: usize,
     },
     AdminSetGrade {
-        user: String,
-        hw: usize,
-        number: usize,
-        score: f64,
+        user:    String,
+        hw:      usize,
+        number:  usize,
+        score:   f64,
         comment: String,
     },
     AdminSetAuto {
-        user: String,
-        hw: usize,
-        score: f64,
+        user:    String,
+        hw:      usize,
+        score:   f64,
         comment: String,
     },
     AdminSetExam {
         user: String,
         exam: usize,
-        num: usize,
-        den: usize,
+        num:  usize,
+        den:  usize,
     },
     AdminSubmissions {
         hw: usize,
@@ -87,17 +87,17 @@ enum Command {
     },
     Cp {
         srcs: Vec<CpArg>,
-        dst: CpArg,
+        dst:  CpArg,
     },
     Deauth,
     EvalGet {
-        hw: usize,
+        hw:     usize,
         number: usize,
     },
     EvalSet {
-        hw: usize,
-        number: usize,
-        score: f64,
+        hw:          usize,
+        number:      usize,
+        score:       f64,
         explanation: String,
     },
     Ls {
@@ -109,15 +109,15 @@ enum Command {
     },
     Partner,
     PartnerRequest {
-        hw: usize,
+        hw:   usize,
         them: String,
     },
     PartnerAccept {
-        hw: usize,
+        hw:   usize,
         them: String,
     },
     PartnerCancel {
-        hw: usize,
+        hw:   usize,
         them: String,
     },
     Rm {
@@ -234,14 +234,13 @@ impl<'a, 'b> GscClientApp<'a, 'b> {
             if let Some(subsubmatches) = submatches.subcommand_matches("add_user") {
                 process_common(subsubmatches, config);
                 let user = subsubmatches.value_of("USER").unwrap().to_owned();
-                let role =
-                    if subsubmatches.is_present("GRADER_ROLE") {
-                        UserRole::Grader
-                    } else if subsubmatches.is_present("ADMIN_ROLE") {
-                        UserRole::Admin
-                    } else {
-                        UserRole::Student
-                    };
+                let role = if subsubmatches.is_present("GRADER_ROLE") {
+                    UserRole::Grader
+                } else if subsubmatches.is_present("ADMIN_ROLE") {
+                    UserRole::Admin
+                } else {
+                    UserRole::Student
+                };
                 Ok(Command::AdminAddUser { user, role })
             } else if let Some(subsubmatches) = submatches.subcommand_matches("del_user") {
                 process_common(subsubmatches, config);

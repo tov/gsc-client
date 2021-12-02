@@ -33,7 +33,7 @@ pub trait Unqualified: RemotePath<Unqual = Self> {
 
     fn as_ref(&self) -> HwOptQual<&str> {
         HwOptQual {
-            hw: self.opt_hw(),
+            hw:   self.opt_hw(),
             name: self.name(),
         }
     }
@@ -44,7 +44,7 @@ pub trait Qualified: RemotePath<Qual = Self> {
 
     fn as_ref(&self) -> HwQual<&str> {
         HwQual {
-            hw: self.hw(),
+            hw:   self.hw(),
             name: self.name(),
         }
     }

@@ -13,8 +13,8 @@ use std::path::PathBuf;
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct JsonStatus {
-    pub status: u16,
-    pub title: String,
+    pub status:  u16,
+    pub title:   String,
     pub message: String,
 }
 

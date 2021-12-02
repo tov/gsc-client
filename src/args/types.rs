@@ -15,7 +15,7 @@ pub type HwOptQual<T> = HwQualBase<Option<usize>, T>;
 
 #[derive(Clone, Debug)]
 pub struct HwQualBase<H, N> {
-    pub hw: H,
+    pub hw:   H,
     pub name: N,
 }
 
@@ -31,7 +31,7 @@ impl<T: FileName> RemotePath for HwOptQual<T> {
 
     fn hw_name(hw: usize, name: impl Into<Self::Name>) -> Self {
         Self {
-            hw: Some(hw),
+            hw:   Some(hw),
             name: name.into(),
         }
     }
@@ -46,7 +46,7 @@ impl<T: FileName> RemotePath for HwOptQual<T> {
 
     fn with_name(&self, name: impl Into<Self::Name>) -> Self {
         Self {
-            hw: self.hw,
+            hw:   self.hw,
             name: name.into(),
         }
     }
@@ -104,7 +104,7 @@ impl<T: FileName> RemotePath for HwQual<T> {
 
     fn with_name(&self, name: impl Into<Self::Name>) -> Self {
         Self {
-            hw: self.hw,
+            hw:   self.hw,
             name: name.into(),
         }
     }
@@ -154,7 +154,7 @@ impl<T: Display> Display for HwOptQual<T> {
 impl<T> From<HwQualBase<T, &str>> for HwQualBase<T, String> {
     fn from(path: HwQualBase<T, &str>) -> Self {
         Self {
-            hw: path.hw,
+            hw:   path.hw,
             name: path.name.to_owned(),
         }
     }
@@ -163,7 +163,7 @@ impl<T> From<HwQualBase<T, &str>> for HwQualBase<T, String> {
 impl<T, U: From<T>> From<HwQual<T>> for HwOptQual<U> {
     fn from(rp: HwQual<T>) -> Self {
         HwOptQual {
-            hw: Some(rp.hw),
+            hw:   Some(rp.hw),
             name: rp.name.into(),
         }
     }

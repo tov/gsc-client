@@ -152,16 +152,20 @@ impl<'a, 'b> AppExt for clap::App<'a, 'b> {
                         .about("Adds a user")
                         .add_everywhere()
                         .req_arg("USER", "Name of user to add")
-                        .arg(clap::Arg::with_name("GRADER_ROLE")
-                            .long("grader")
-                            .takes_value(false)
-                            .conflicts_with("ADMIN_ROLE")
-                            .help("Creates user with grader role"))
-                        .arg(clap::Arg::with_name("ADMIN_ROLE")
-                            .long("admin")
-                            .takes_value(false)
-                            .conflicts_with("GRADER_ROLE")
-                            .help("Creates user with admin role")),
+                        .arg(
+                            clap::Arg::with_name("GRADER_ROLE")
+                                .long("grader")
+                                .takes_value(false)
+                                .conflicts_with("ADMIN_ROLE")
+                                .help("Creates user with grader role"),
+                        )
+                        .arg(
+                            clap::Arg::with_name("ADMIN_ROLE")
+                                .long("admin")
+                                .takes_value(false)
+                                .conflicts_with("GRADER_ROLE")
+                                .help("Creates user with admin role"),
+                        ),
                 )
                 .subcommand(
                     SubCommand::with_name("del_user")

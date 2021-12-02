@@ -48,10 +48,10 @@ use crate::errors::ApiKeyExplanation;
 use std::cmp::Ordering;
 
 pub struct GscClient {
-    http: blocking::Client,
-    config: config::Config,
+    http:            blocking::Client,
+    config:          config::Config,
     submission_uris: RefCell<HashMap<String, Vec<Option<String>>>>,
-    had_warning: Cell<bool>,
+    had_warning:     Cell<bool>,
 }
 
 impl GscClient {
@@ -102,7 +102,7 @@ impl GscClient {
 
     pub fn admin_add_user(&self, name: &str, role: messages::UserRole) -> Result<()> {
         let uri = format!("{}/api/users", self.config.get_endpoint());
-        let message = messages::UserCreate {name, role};
+        let message = messages::UserCreate { name, role };
         let request = self.http.post(&uri).json(&message);
         v2!("Creating user {} with role {}...", name, role);
         let response = self.send_request(request)?;
@@ -646,7 +646,7 @@ impl GscClient {
                     let mut line_no = 0;
 
                     for file in files {
-                        if ! file.purpose.is_line_numbered() {
+                        if !file.purpose.is_line_numbered() {
                             continue;
                         }
 
@@ -798,8 +798,8 @@ impl GscClient {
         let mut message = messages::UserChange::default();
         message.partner_requests = vec![messages::PartnerRequest {
             assignment_number: hw,
-            user: them.to_owned(),
-            status: op,
+            user:              them.to_owned(),
+            status:            op,
         }];
 
         let request = self.http.patch(&uri).json(&message);
@@ -1091,7 +1091,10 @@ impl GscClient {
 
     fn load_effective_credentials(&self) -> Result<(String, Credentials)> {
         let creds = self.load_credentials()?;
-        let user  = self.config.get_on_behalf().unwrap_or_else(|| creds.username());
+        let user = self
+            .config
+            .get_on_behalf()
+            .unwrap_or_else(|| creds.username());
         Ok((user.to_owned(), creds))
     }
 
@@ -1197,8 +1200,7 @@ impl messages::FilePurpose {
     }
 
     fn is_line_numbered(self) -> bool {
-        self != messages::FilePurpose::Resource
-            && !self.is_automatically_deletable()
+        self != messages::FilePurpose::Resource && !self.is_automatically_deletable()
     }
 }
 

@@ -6,7 +6,7 @@ impl GscClient {
         self.try_warn(|| {
             let src = self.fetch_one_matching_filename(src)?;
             let mut dst = HwQual {
-                hw: src.hw,
+                hw:   src.hw,
                 name: src.name.as_str(),
             };
 
